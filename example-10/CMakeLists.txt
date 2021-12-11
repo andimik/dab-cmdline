@@ -215,7 +215,7 @@ endif ()
            if (NOT LIBRTLSDR_FOUND)
                message(FATAL_ERROR "please install librtlsdr")
            endif ()
-	   ###include_directories (${RTLSDR_INCLUDE_DIR})
+	   include_directories (${LIBRTLSDR_INCLUDE_DIR})
 
 	   include_directories (
 	        ../devices/rtlsdr-handler/
@@ -417,7 +417,7 @@ endif ()
 	                       ${CMAKE_DL_LIBS}
 	)
 
-	INSTALL (TARGETS ${objectName} DESTINATION .)
+	INSTALL (TARGETS ${objectName})  # install to default (bin)
 
 #####################################################################
 
@@ -425,7 +425,7 @@ endif ()
 	                decodefic.cpp fibbits.cpp fibbits.h proc_fig0ext6.cpp proc_fig0ext6.h
 	)
 
-	INSTALL (TARGETS decodefic DESTINATION .)
+	INSTALL (TARGETS decodefic)
 
 ########################################################################
 # Create uninstall target

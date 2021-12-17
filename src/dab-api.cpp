@@ -35,13 +35,14 @@ void *dabInit(deviceHandler *theDevice, uint8_t Mode,
               programQuality_t programquality_Handler,
               motdata_t motdata_Handler,
               RingBuffer<std::complex<float>> *spectrumBuffer,
-              RingBuffer<std::complex<float>> *iqBuffer, void *userData) {
+              RingBuffer<std::complex<float>> *iqBuffer, void *userData,
+              float init_freq_offset, int verbosity) {
   dabProcessor *theClass = new dabProcessor(
       theDevice, Mode, syncsignal_Handler, systemdata_Handler,
       ensemblename_Handler, programname_Handler, fib_quality_Handler,
       audioOut_Handler, bytesOut_Handler, dataOut_Handler, programdata_Handler,
       programquality_Handler, motdata_Handler, spectrumBuffer, iqBuffer,
-      userData);
+      userData, init_freq_offset, verbosity);
   return (void *)theClass;
 }
 

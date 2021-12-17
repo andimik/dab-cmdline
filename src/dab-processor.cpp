@@ -37,14 +37,17 @@ dabProcessor::dabProcessor(
     audioOut_t audioOut, bytesOut_t bytesOut, dataOut_t dataOut_handler,
     programdata_t programdata, programQuality_t mscQuality,
     motdata_t motdata_Handler, RingBuffer<std::complex<float>> *spectrumBuffer,
-    RingBuffer<std::complex<float>> *iqBuffer, void *userData)
+    RingBuffer<std::complex<float>> *iqBuffer, void *userData,
+    float _init_freq_offset, int _verbosity)
     : tii_framedelay(20),
       tii_counter(0),
       my_tiiHandler(nullptr),
       my_tiiExHandler(nullptr),
       tii_alfa(-1.0F),
       tii_resetFrameCount(-1),
+      verbosity(_verbosity),
       params(dabMode),
+      init_freq_offset(_init_freq_offset),
       myReader(this, inputDevice, spectrumBuffer),
       phaseSynchronizer(dabMode, THRESHOLD, DIFF_LENGTH),
       my_TII_Detector(dabMode),
@@ -90,7 +93,7 @@ void dabProcessor::run() {
   timeSyncer myTimeSyncer(&myReader);
   int32_t i;
   float fineOffset = 0;
-  float coarseOffset = 0;
+  float coarseOffset = init_freq_offset;
   bool correctionNeeded = true;
   std::vector<complex<float>> ofdmBuffer(T_null);
   int dip_attempts = 0;
@@ -174,7 +177,11 @@ void dabProcessor::run() {
       int correction = phaseSynchronizer.estimateOffset(ofdmBuffer.data());
       if (correction != 100) {
         coarseOffset += correction * carrierDiff;
-        if (abs(coarseOffset) > Khz(35)) coarseOffset = 0;
+        if (abs(coarseOffset) > Khz(35)) {
+            if (verbosity)
+              fprintf(stderr, "reset of coarse frequency offset from %f\n", coarseOffset);
+            coarseOffset = init_freq_offset;
+        }
       }
     }
     //
@@ -206,6 +213,9 @@ void dabProcessor::run() {
     //	we integrate the newly found frequency error with the
     //	existing frequency error.
     fineOffset += 0.1 * arg(FreqCorr) / M_PI * (carrierDiff);
+
+    if (verbosity >= 2)
+      fprintf(stderr, "frequency offset: coarse %f  fine %f   sum %f\n", coarseOffset, fineOffset, coarseOffset + fineOffset);
 
     //	at the end of the frame, just skip Tnull samples
     myReader.getSamples(ofdmBuffer.data(), T_null, coarseOffset + fineOffset);
@@ -249,7 +259,7 @@ void dabProcessor::run() {
             float outMinSNR[24];
             float outNxtSNR[24];
             my_TII_Detector.processNULL_ex(&numOut, outTii, outAvgSNR,
-                                           outMinSNR, outNxtSNR);
+                                           outMinSNR, outNxtSNR, verbosity);
             if (numOut > 0)
               my_tiiExHandler(numOut, outTii, outAvgSNR, outMinSNR, outNxtSNR,
                               my_TII_Detector.getNumBuffers(),

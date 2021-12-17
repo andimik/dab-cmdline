@@ -200,7 +200,8 @@ void *dabInit(
     audioOut_t audioOut_Handler, dataOut_t dataOut_Handler, bytesOut_t bytesOut,
     programdata_t programdataHandler, programQuality_t program_qualityHandler,
     motdata_t motdata_Handler, RingBuffer<std::complex<float>> *spectrumBuffer,
-    RingBuffer<std::complex<float>> *iqBuffer, void *userData);
+    RingBuffer<std::complex<float>> *iqBuffer, void *userData,
+    float init_freq_offset, int verbosity);
 
 //	dabExit cleans up the library on termination
 void dabExit(void *);

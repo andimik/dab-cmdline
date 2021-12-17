@@ -1,4 +1,4 @@
-#
+
 /*
  *    Copyright (C) 2015, 2016, 2017
  *    Jan van Katwijk (J.vanKatwijk@gmail.com)
@@ -881,6 +881,8 @@ int main(int argc, char **argv) {
   int32_t waitingTime = 10 * T_UNIT_MUL;
   int32_t waitingTimeInit = 10 * T_UNIT_MUL;
   int32_t waitAfterEnsemble = -1;
+  float init_freq_offset = 0.0F;
+  int verbosity = 0;
 
   bool autogain = false;
   bool printAsCSV = false;
@@ -951,7 +953,7 @@ int main(int argc, char **argv) {
 
   while (
       (opt = getopt(argc, argv,
-                    "W:A:M:B:P:p:T:S:E:cft:a:r:xO:w:n:" FILE_OPTS NON_FILE_OPTS
+                    "W:A:M:B:P:p:T:S:E:cft:a:r:xO:w:n:z:v" FILE_OPTS NON_FILE_OPTS
                         RTLSDR_OPTS RTL_TCP_OPTS)) != -1) {
     fprintf(stderr, "opt = %c\n", opt);
     switch (opt) {
@@ -959,6 +961,15 @@ int main(int argc, char **argv) {
         waitingTimeInit = waitingTime = int32_t(atoi(optarg));
         fprintf(stderr, "read option -W : max time to aquire sync is %d %s\n",
                 int(waitingTime), T_UNITS);
+        break;
+
+      case 'z':
+        init_freq_offset = atof(optarg);
+        fprintf(stderr, "read option -z: initial frequency offset %f\n", init_freq_offset);
+        break;
+
+      case 'v':
+        ++verbosity;
         break;
 
       case 'A':
@@ -1150,7 +1161,9 @@ int main(int argc, char **argv) {
               motdataHandler,  // MOT in PAD
               NULL,            // no spectrum shown
               NULL,            // no constellations
-              NULL             // Ctx
+              NULL,            // Ctx
+              init_freq_offset,
+              verbosity
       );
   if (theRadio == NULL) {
     fprintf(stderr, "sorry, no radio available, fatal\n");
@@ -1855,6 +1868,8 @@ void printOptions(void) {
       "	-S hexnumber use hexnumber to identify program\n"
       "	-w fileName  write audio to wave file\n"
       "	-f           write binary FIC data to ficdata.fic\n"
-      "	-n runtime   stream/save runtime seconds of audio, then exit\n\n",
+      "	-n runtime   stream/save runtime seconds of audio, then exit\n"
+      "	-z freq_off  initial 'coarse' frequency offset\n"
+      "	-v           increase verbosity\n\n",
       T_UNITS, T_UNITS, devOptHelp);
 }

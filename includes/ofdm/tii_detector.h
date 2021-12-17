@@ -41,7 +41,7 @@ class TII_Detector : public phaseTable {
   int16_t find_C(int16_t);
   void processNULL(int16_t *, int16_t *);
   void processNULL_ex(int *pNumOut, int *outTii, float *outAvgSNR,
-                      float *outMinSNR, float *outNxtSNR);
+                      float *outMinSNR, float *outNxtSNR, int verbosity);
 
  private:
   dabParams params;
@@ -61,6 +61,7 @@ class TII_Detector : public phaseTable {
  private:
   float P_tmpNorm[2048];
   float P_avg[384];  // 8 groups per 24*2 carriers = 384 carriers
+  int   debug_fileno;
 
   bool isFirstAdd;
   int16_t fillCount;

@@ -49,7 +49,8 @@ class dabProcessor {
                syncsignal_t, systemdata_t, ensemblename_t, programname_t,
                fib_quality_t, audioOut_t, bytesOut_t, dataOut_t, programdata_t,
                programQuality_t, motdata_t, RingBuffer<std::complex<float>> *,
-               RingBuffer<std::complex<float>> *, void *);
+               RingBuffer<std::complex<float>> *, void *,
+               float init_freq_offset, int verbosity);
   virtual ~dabProcessor();
   void reset();
   void stop();
@@ -96,9 +97,11 @@ class dabProcessor {
   tii_ex_t my_tiiExHandler;
   float tii_alfa;
   int tii_resetFrameCount;
+  int verbosity;
 
   deviceHandler *inputDevice;
   dabParams params;
+  float init_freq_offset;
   sampleReader myReader;
   phaseReference phaseSynchronizer;
   TII_Detector my_TII_Detector;

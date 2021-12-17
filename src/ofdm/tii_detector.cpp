@@ -90,6 +90,7 @@ TII_Detector::TII_Detector(uint8_t dabMode)
   fillCount = 0;
   fft_buffer = my_fftHandler.getVector();
   isFirstAdd = true;
+  debug_fileno = 0;
   numUsedBuffers = 0;
 
   window.resize(T_u);
@@ -491,7 +492,7 @@ static inline float powerLevel(float snr) {
 }
 
 void TII_Detector::processNULL_ex(int *pNumOut, int *outTii, float *outAvgSNR,
-                                  float *outMinSNR, float *outNxtSNR) {
+                                  float *outMinSNR, float *outNxtSNR, int verbosity) {
   float Psub[NUM_GROUPS][NUM_SUBIDS];  // power per subID per group
   int Csub[NUM_GROUPS][NUM_SUBIDS];    // subID in 0 .. 23 per group - when
                                        // sorting powers Psub[][]
@@ -523,6 +524,29 @@ void TII_Detector::processNULL_ex(int *pNumOut, int *outTii, float *outAvgSNR,
     }
   }
 
+  FILE *tii_file = NULL;
+  while (verbosity >= 3)  // allow break
+  {
+      char fn[256];
+      ++debug_fileno;
+      sprintf(fn, "tii_spec_%04d.csv", debug_fileno);
+      tii_file = fopen(fn, "w");
+      if (!tii_file)
+          break;
+
+      float Pmax = 0.0;
+      for (int j = 0; j < NUM_TII_EVAL_CARRIERS; ++j)
+        Pmax = std::max(P_avg[j], Pmax);
+
+      const float scaleP = 1000.0 / Pmax;
+      for (int j = 0; j < NUM_TII_EVAL_CARRIERS; ++j)
+          fprintf(tii_file, "%d, %d, %f\n", j, int(P_avg[j] * scaleP), P_avg[j]);
+
+      fprintf(tii_file, "\n");
+
+      break;
+  }
+
   // initialize num_subIDs[]
   for (i = 0; i < NUM_SUBIDS; ++i) num_subIDs[i] = 0;
 
@@ -536,6 +560,14 @@ void TII_Detector::processNULL_ex(int *pNumOut, int *outTii, float *outAvgSNR,
       P[i] = P_avg[grpCarrierOff + 2 * i] + P_avg[grpCarrierOff + 2 * i + 1];
       C[i] = grpCarrierOff + 2 * i;
     }
+
+    if (tii_file)
+    {
+        fprintf(tii_file, "\ngroup, %d\n", groupNo);
+        for (i = 0; i < NUM_SUBIDS; ++i)
+            fprintf(tii_file, "group, %d, sub, %d, carrieroff, %d, Psum, %f, Pcar, %d\n", groupNo, i, grpCarrierOff, P[i], C[i]);
+    }
+
     // bubble sort 4 smallest elements to the end
     //   using bubble sort cause we don't want to sort all
     for (j = 0; j < NUM_MINS_FOR_NOISE; ++j) {
@@ -573,6 +605,14 @@ void TII_Detector::processNULL_ex(int *pNumOut, int *outTii, float *outAvgSNR,
       C[j] = (C[j] - grpCarrierOff) / 2;  // => C[j] in 0 .. 23
       ++num_subIDs[C[j]];
     }
+
+    if (tii_file)
+    {
+        fprintf(tii_file, "\ngroup max %d, %d\n", MAX_NUM_TII, groupNo);
+        for (j = 0; j < MAX_NUM_TII; ++j)
+            fprintf(tii_file, "group, %d, max, %d, Psum, %f, Sub %d\n", groupNo, j, P[j], C[j]);
+    }
+
   }
 
   // per possible subID .. determine mainID from energy pattern over groups
@@ -650,6 +690,9 @@ void TII_Detector::processNULL_ex(int *pNumOut, int *outTii, float *outAvgSNR,
       ++(*pNumOut);
     }
   }
+
+  if (tii_file)
+      fclose(tii_file);
 }
 
 //

@@ -1,4 +1,4 @@
-#
+
 /*
  *    Copyright (C) 2016, 2017
  *    Jan van Katwijk (J.vanKatwijk@gmail.com)
@@ -209,13 +209,12 @@ void dabProcessor::run() {
 
     //	at the end of the frame, just skip Tnull samples
     myReader.getSamples(ofdmBuffer.data(), T_null, coarseOffset + fineOffset);
+#if 0
     float sum = 0;
     for (i = 0; i < T_null; i++) sum += abs(ofdmBuffer[i]);
     sum /= T_null;
 
     float sum2 = myReader.get_sLevel();
-    (void)sum2;  // avoid compiler warning
-#if 0
 	static int ccc	= 0;
 	if (++ccc > 10) {
 	   ccc = 0;

@@ -96,7 +96,6 @@ class dabProcessor {
   tii_ex_t my_tiiExHandler;
   float tii_alfa;
   int tii_resetFrameCount;
-  unsigned tii_num;
 
   deviceHandler *inputDevice;
   dabParams params;

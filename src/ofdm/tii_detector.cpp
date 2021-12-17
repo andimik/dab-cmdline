@@ -539,7 +539,7 @@ void TII_Detector::processNULL_ex(int *pNumOut, int *outTii, float *outAvgSNR,
     // bubble sort 4 smallest elements to the end
     //   using bubble sort cause we don't want to sort all
     for (j = 0; j < NUM_MINS_FOR_NOISE; ++j) {
-      for (i = 0; i < NUM_SUBIDS - 2 - j; ++i) {
+      for (i = 0; i < NUM_SUBIDS - 1 - j; ++i) {
         if (P[i] < P[i + 1]) {
           std::swap(P[i], P[i + 1]);
           std::swap(C[i], C[i + 1]);

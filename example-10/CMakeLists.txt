@@ -417,7 +417,7 @@ endif ()
 	                       ${CMAKE_DL_LIBS}
 	)
 
-	INSTALL (TARGETS ${objectName})  # install to default (bin)
+	INSTALL (TARGETS ${objectName} RUNTIME DESTINATION bin)  # install to default (bin)
 
 #####################################################################
 
@@ -425,7 +425,7 @@ endif ()
 	                decodefic.cpp fibbits.cpp fibbits.h proc_fig0ext6.cpp proc_fig0ext6.h
 	)
 
-	INSTALL (TARGETS decodefic)
+	INSTALL (TARGETS decodefic RUNTIME DESTINATION bin)
 
 ########################################################################
 # Create uninstall target

@@ -69,24 +69,25 @@ typedef struct {
 
 //
 typedef struct {
-  bool defined;
-  int16_t componentNr;  // 0 == main component
-  int16_t subchId;
-  int16_t startAddr;
-  bool shortForm;
-  int16_t protLevel;
-  int16_t length; /* CUs */
-  int16_t bitRate;
-  int16_t ASCTy;
-  int16_t language;
-  int16_t programType;
-  int16_t protIdxOrCase;
-  int16_t protTabIdx;
-  int16_t subChanSize;
-  bool is_madePublic;
-  bool componentHasLabel;
-  char componentLabel[32];
-  char componentAbbr[32];
+	bool defined;
+	int16_t componentNr;  // 0 == main component
+	int16_t subchId;
+	int16_t startAddr;
+	uint8_t	ecc;
+	bool shortForm;
+	int16_t protLevel;
+	int16_t length; /* CUs */
+	int16_t bitRate;
+	int16_t ASCTy;
+	int16_t language;
+	int16_t programType;
+	int16_t protIdxOrCase;
+	int16_t protTabIdx;
+	int16_t subChanSize;
+	bool is_madePublic;
+	bool componentHasLabel;
+	char componentLabel[32];
+	char componentAbbr[32];
 } audiodata;
 
 //////////////////////// C A L L B A C K F U N C T I O N S ///////////////

@@ -1755,7 +1755,12 @@ int	main (int argc, char **argv) {
                   }
               }
               outLine += comma + std::to_string(int(ad.language));
-              outLine += comma + prepCsvStr(getLanguage(ad.language));
+              {
+                  const char *langName = getLanguage(ad.language);
+                  outLine += comma + prepCsvStr(
+                      (langName != nullptr && langName[0] != '\0') ? langName : "unknown"
+                  );
+              }
               outLine += comma + std::to_string(int(ad.programType));
               outLine += comma + prepCsvStr(getProgramType(gotInterTabId, interTabId,
                                                     ad.programType));

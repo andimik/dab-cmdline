@@ -474,7 +474,7 @@ int16_t fib_processor::HandleFIG0Extension2(const uint8_t *d, int16_t offset,
   (void)CN_bit;
   (void)OE_bit;
 int16_t lOffset = 8 * offset;
-int16_t i;
+// int16_t i;
 uint8_t ecc;
 uint8_t cId;
 uint32_t SId;
@@ -748,7 +748,7 @@ uint8_t extFlag         = getBits_1 (d, offset + 0);
 	   return true;
 
 	int bitOffset   = offset + 16;
-        int interTable  = getBits_8 (d, bitOffset);
+       // int interTable  = getBits_8 (d, bitOffset);   // unused at the moment
         bitOffset += 8;
         while (bitOffset < Length * 8) {
            uint16_t nrServices = getBits_2 (d, bitOffset);
@@ -1811,21 +1811,29 @@ void	fib_processor::dataforAudioService (serviceId *selectedService,
 	   d -> protIdxOrCase	= subChannels [subchId].protIdxOrCase;
 	   d -> componentNr	= ServiceComps [j].componentNr;
 	   d -> ASCTy		= ServiceComps [j].ASCTy;
-	   d -> language	= selectedService -> language;
+	   
+	   // Try subchannel language first, fall back to service language if -1
+	   d -> language	= (subChannels [subchId].language >= 0) ? 
+	                      subChannels [subchId].language : 
+	                      selectedService -> language;
+	                      
+	                      
+	   // d -> language	= subChannels [subchId].language; // will fix the subchannel language bug
+	   // d -> language	= selectedService -> language;
 	   d -> ecc		= selectedService -> ecc;
 	   d -> programType	= selectedService -> programType;
 	   d -> defined		= true;
 
-    d->componentHasLabel = ServiceComps[j].hasLabel;
-    if ( ServiceComps[j].hasLabel ) {
-      strcpy( d->componentLabel, ServiceComps[j].label );
-      strcpy( d->componentAbbr, ServiceComps[j].abbr );
-    } else {
-      d->componentLabel[0] = 0;
-      d->componentAbbr[0] = 0;
-    }
-    break;
-  }
+          d->componentHasLabel = ServiceComps[j].hasLabel;
+          if ( ServiceComps[j].hasLabel ) {
+            strcpy( d->componentLabel, ServiceComps[j].label );
+            strcpy( d->componentAbbr, ServiceComps[j].abbr );
+          } else {
+            d->componentLabel[0] = 0;
+            d->componentAbbr[0] = 0;
+          }
+          break;
+        }
 }
 
 void fib_processor::printAll_metaInfo(FILE *out) {

@@ -37,9 +37,11 @@
  *	will extract the Tu samples, do an FFT and extract the
  *	carriers and map them on (soft) bits
  */
-ofdmDecoder::ofdmDecoder(uint8_t dabMode,
+	ofdmDecoder::ofdmDecoder(uint8_t dabMode,
                          RingBuffer<std::complex<float>> *iqBuffer)
-    : params(dabMode), my_fftHandler(dabMode), myMapper(dabMode) {
+	                                : params (dabMode),
+	                                  my_fftHandler (dabMode),
+	                                  myMapper(dabMode) {
   this->iqBuffer = iqBuffer;
   this->T_s = params.get_T_s();
   this->T_u = params.get_T_u();

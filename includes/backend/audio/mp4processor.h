@@ -1,25 +1,3 @@
-#
-/*
- *    Copyright (C) 2013, 2014
- *    Jan van Katwijk (J.vanKatwijk@gmail.com)
- *    Lazy Chair Programming
- *
- *    This file is part of the DAB-library
- *    DAB-library is free software; you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation; either version 2 of the License, or
- *    (at your option) any later version.
- *
- *    DAB-library is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
- *
- *    You should have received a copy of the GNU General Public License
- *    along with DAB-library; if not, write to the Free Software
- *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-#
 #ifndef __MP4PROCESSOR__
 #define __MP4PROCESSOR__
 /*
@@ -29,6 +7,7 @@
 //
 #include <stdint.h>
 #include <stdio.h>
+#include <vector>
 #include "backend-base.h"
 #include "dab-api.h"
 #include "dab-constants.h"
@@ -44,6 +23,15 @@ class mp4Processor : public backendBase {
   ~mp4Processor(void);
   virtual void setError_handler(decodeErrorReport_t err_Handler);
   void addtoFrame(uint8_t *);
+  
+  // NEW: Add getter for stream parameters
+  bool getLastStreamParameters(stream_parms &params) {
+      if (hasStreamParameters) {
+          params = lastStreamParameters;
+          return true;
+      }
+      return false;
+  }
 
  private:
   bool processSuperframe(uint8_t[], int16_t);
@@ -53,10 +41,6 @@ class mp4Processor : public backendBase {
   decodeErrorReport_t errorReportHandler;
   void *ctx;
   padHandler my_padHandler;
-  // void            handle_aacFrame (uint8_t *,
-  //                                 int16_t frame_length,
-  //                                 stream_parms *sp,
-  //                                 bool*);
   void buildHeader(int16_t framelen, stream_parms *sp, uint8_t *header);
   int16_t superFramesize;
   int16_t blockFillIndex;
@@ -71,7 +55,6 @@ class mp4Processor : public backendBase {
 
   firecode_checker fc;
   reedSolomon my_rsDecoder;
-  //	and for the aac decoder
   faadDecoder aacDecoder;
 
   int32_t totalFrameCount;
@@ -90,8 +73,11 @@ class mp4Processor : public backendBase {
   void show_frameErrors(int);
   void show_rsErrors(int);
   void show_aacErrors(int);
-
   void isStereo(bool);
+  
+  // NEW: Add member variables for stream parameters
+  stream_parms lastStreamParameters;
+  bool hasStreamParameters;
 };
 
 #endif

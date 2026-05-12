@@ -326,7 +326,7 @@ uint8_t dabProcessor::kindofService(int SId) {
 }
 
 void dabProcessor::dataforAudioService(std::string s, audiodata *dd) {
-  my_ficHandler.dataforAudioService(s, dd, 0);
+  my_ficHandler.dataforAudioService (s, dd, 0);
 }
 
 void dabProcessor::dataforAudioService(std::string s, audiodata *d, int16_t c) {

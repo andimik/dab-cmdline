@@ -165,6 +165,9 @@ bool mp4Processor::processSuperframe(uint8_t frameBytes[], int16_t base) {
   streamParameters.aacChannelMode = (outVector[2] >> 4) & 01;  // bit 19
   streamParameters.psFlag = (outVector[2] >> 3) & 01;          // bit 20
   streamParameters.mpegSurround = (outVector[2] & 07);         // bits 21 .. 23
+  
+  this->lastStreamParameters = streamParameters;
+  this->hasStreamParameters = true;
 
   switch (2 * streamParameters.dacRate + streamParameters.sbrFlag) {
     default:  // cannot happen

@@ -31,11 +31,11 @@ tii_element::tii_element(int16_t subId, int16_t TD, float latitudeOffset,
   this->longitudeOffset = longitudeOffset;
 }
 
-tii_table::tii_table(void) {}
+tii_table::tii_table () {}
 
-tii_table::~tii_table(void) {}
+tii_table::~tii_table () {}
 
-void tii_table::cleanUp(void) {
+void tii_table::cleanUp () {
   offsets.clear();
   mainId = -1;
 }
@@ -117,7 +117,7 @@ std::complex<float> tii_table::get_coordinates(int16_t mainId, int16_t subId,
   return std::complex<float>(0, 0);
 }
 
-void tii_table::print_coordinates(void) {
+void tii_table::print_coordinates () {
   uint16_t i;
   if (mainId < 0) return;
 

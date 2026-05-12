@@ -1,6 +1,5 @@
-
 /*
- *    Copyright (C) 2015, 2016, 2017
+ *    Copyright (C) 2015, 2016, 2017, 2026
  *    Jan van Katwijk (J.vanKatwijk@gmail.com)
  *    Lazy Chair Computing
  *
@@ -11,20 +10,6 @@
  *    it under the terms of the GNU General Public License as published by
  *    the Free Software Foundation; either version 2 of the License, or
  *    (at your option) any later version.
- *
- *    DAB-library is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
- *
- *    You should have received a copy of the GNU General Public License
- *    along with DAB-library; if not, write to the Free Software
- *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- *	E X A M P L E  P R O G R A M
- *	This program might (or might not) be used to mould the interface to
- *	your wishes. Do not take it as a definitive and "ready" program
- *	for the DAB-library
  */
 #include <getopt.h>
 #include <signal.h>
@@ -106,26 +91,26 @@ static int32_t timeOut = 0;
 static int32_t nextOut = 0;
 
 struct MyServiceData {
-  MyServiceData(void) {
-    SId = 0;
-    gotAudio = false;
-    gotAudioPacket[0] = false;
-    gotAudioPacket[1] = false;
-    gotAudioPacket[2] = false;
-    gotAudioPacket[3] = false;
-    gotPacket = false;
-  }
+    MyServiceData () {
+        SId		= 0;
+        ecc		= 0;
+        gotAudio = false;
+        gotPacket = false;
+        serviceLanguage = -1;
+        for(int i=0; i<4; ++i) gotAudioPacket[i] = false;
+    }
 
-  int SId;
-  std::string programName;
-  std::string programAbbr;
-  bool gotAudio;
-  audiodata audio;
-  bool gotAudioPacket[4];  // 1 .. 4 --> 0 .. 3
-  packetdata audiopacket[4];
-
-  bool gotPacket;
-  packetdata packet;
+    int SId;
+    uint8_t		ecc;
+    std::string	programName;
+    std::string	programAbbr;
+    bool		gotAudio;
+    audiodata	audio;
+    bool		gotAudioPacket [4];  // 1 .. 4 --> 0 .. 3
+    packetdata	audiopacket[4];
+    bool gotPacket;
+    packetdata packet;
+    int serviceLanguage;
 };
 
 struct MyGlobals {
@@ -135,37 +120,40 @@ struct MyGlobals {
 MyGlobals globals;
 
 struct ExTiiInfo {
-  ExTiiInfo()
-      : tii(100),
-        numOccurences(0),
-        maxAvgSNR(-200.0F),
-        maxMinSNR(-200.0F),
-        maxNxtSNR(-200.0F) {}
+    ExTiiInfo ()
+       : tii(100),
+         numOccurences (0),
+         maxAvgSNR     (-200.0F),
+         maxMinSNR     (-200.0F),
+         maxNxtSNR     (-200.0F) {
+    }
 
-  int tii;
-  int numOccurences;
-  float maxAvgSNR;
-  float maxMinSNR;
-  float maxNxtSNR;
+    int tii;
+    int numOccurences;
+    float maxAvgSNR;
+    float maxMinSNR;
+    float maxNxtSNR;
 
-  bool operator<(const ExTiiInfo &b) const {
-    const ExTiiInfo &a = *this;
-    const int minSNR_a =
-        int((a.maxMinSNR < 0.0F ? -0.5F : 0.5F) + a.maxMinSNR * 10.0F);
-    const int minSNR_b =
-        int((b.maxMinSNR < 0.0F ? -0.5F : 0.5F) + b.maxMinSNR * 10.0F);
-    if (minSNR_a != minSNR_b) return (minSNR_a > minSNR_b);
-    const int avgSNR_a =
-        int((a.maxAvgSNR < 0.0F ? -0.5F : 0.5F) + a.maxAvgSNR * 10.0F);
-    const int avgSNR_b =
-        int((b.maxAvgSNR < 0.0F ? -0.5F : 0.5F) + b.maxAvgSNR * 10.0F);
-    return (avgSNR_a > avgSNR_b);
-  }
+    bool operator < (const ExTiiInfo &b) const {
+       const ExTiiInfo &a = *this;
+       const int minSNR_a =
+          int((a.maxMinSNR < 0.0F ? -0.5F : 0.5F) + a.maxMinSNR * 10.0F);
+       const int minSNR_b =
+          int((b.maxMinSNR < 0.0F ? -0.5F : 0.5F) + b.maxMinSNR * 10.0F);
+
+       if (minSNR_a != minSNR_b)
+          return (minSNR_a > minSNR_b);
+       const int avgSNR_a =
+          int((a.maxAvgSNR < 0.0F ? -0.5F : 0.5F) + a.maxAvgSNR * 10.0F);
+       const int avgSNR_b =
+          int((b.maxAvgSNR < 0.0F ? -0.5F : 0.5F) + b.maxAvgSNR * 10.0F);
+       return (avgSNR_a > avgSNR_b);
+    }
 };
 
 std::map<int, int> tiiMap;
 std::map<int, ExTiiInfo> tiiExMap;
-int numAllTii = 0;
+int	numAllTii = 0;
 
 #define PRINT_COLLECTED_STAT_AND_TIME 0
 #define PRINT_LOOPS 0
@@ -193,32 +181,38 @@ int numAllTii = 0;
 #define SINCE_START
 #endif
 
-void printCollectedCallbackStat(const char *txt,
-                                int out = PRINT_COLLECTED_STAT_AND_TIME);
+static
+void	printCollectedCallbackStat (const char *txt,
+                                    int out = PRINT_COLLECTED_STAT_AND_TIME);
 
-void printCollectedErrorStat(const char *txt);
+static
+void	printCollectedErrorStat	(const char *txt);
 
-inline void sleepMillis(unsigned ms) { usleep(ms * 1000); }
+static inline
+void	sleepMillis		(unsigned ms) {
+    usleep (ms * 1000);
+}
 
-inline uint64_t currentMSecsSinceEpoch() {
-  struct timeval te;
+static inline
+uint64_t currentMSecsSinceEpoch	() {
+    struct timeval te;
 
-  gettimeofday(&te, 0);  // get current time
-  uint64_t milliseconds =
-      te.tv_sec * 1000LL + te.tv_usec / 1000;  // calculate milliseconds
-  //	printf("milliseconds: %lld\n", milliseconds);
-  return milliseconds;
+    gettimeofday (&te, 0);  // get current time
+    uint64_t milliseconds =
+       te.tv_sec * 1000LL + te.tv_usec / 1000;  // calculate milliseconds
+    return milliseconds;
 }
 
 uint64_t msecs_progStart = 0;
 
-inline long sinceStart(void) {
-  uint64_t n = currentMSecsSinceEpoch();
-
-  return long(n - msecs_progStart);
+static inline
+long	sinceStart (void) {
+    uint64_t n = currentMSecsSinceEpoch ();
+    return long(n - msecs_progStart);
 }
 
-void printOptions(void);  // forward declaration
+void	printOptions (void);  // forward declaration
+
 //	we deal with callbacks from different threads. So, if you extend
 //	the functions, take care and add locking whenever needed
 static std::atomic<bool> run;
@@ -235,52 +229,77 @@ static std::atomic<bool> ensembleRecognized;
 tcpServer tdcServer(8888);
 #endif
 
-static std::string programName = "Sky";
-static int32_t serviceIdentifier = -1;
-static int recRate = 0;
-static bool recStereo = false;
-static bool haveStereo = false;
-static bool useFirstProgramName = true;
-static bool haveProgramNameForSID = false;
-static bool gotSampleData = false;
+static
+std::string programName		= "Sky";
+static
+int32_t serviceIdentifier	= -1;
+static
+int	recRate			= 0;
+static
+bool	recStereo		= false;
+static
+bool	haveStereo		= false;
+static
+bool	useFirstProgramName	= true;
+static
+bool	haveProgramNameForSID	= false;
+static
+bool	gotSampleData		= false;
+static
+std::string programNameForSID;
 
-static std::string programNameForSID;
+static
+uint64_t msecs_smp_start;
+static
+uint64_t msecs_smp_curr;
+static
+uint64_t num_samples_since_start;
+static
+uint64_t num_samples_per_check;
+static
+uint64_t num_samples_next_check;
+static
+int print_mismatch_counter;
+static
+int	recTolerance		= -1;
 
-static uint64_t msecs_smp_start;
-static uint64_t msecs_smp_curr;
-static uint64_t num_samples_since_start;
-static uint64_t num_samples_per_check;
-static uint64_t num_samples_next_check;
-static int print_mismatch_counter;
-static int recTolerance = -1;
+static
+std::string ensembleName;
+static
+std::string ensembleAbbr;
+static
+uint32_t ensembleIdentifier	= -1;
 
-static std::string ensembleName;
-static std::string ensembleAbbr;
-static uint32_t ensembleIdentifier = -1;
+static
+bool	scanOnly		= false;
+static
+int16_t minSNRtoExit		= -32768;
+static
+deviceHandler *theDevice	= nullptr;
 
-static bool scanOnly = false;
-static int16_t minSNRtoExit = -32768;
-static deviceHandler *theDevice = nullptr;
-
-static void sighandler(int signum) {
-  fprintf(stderr, "Signal caught, terminating!\n");
-  run.store(false);
+static
+void	sighandler (int signum) {
+    fprintf(stderr, "Signal caught, terminating!\n");
+    run.store (false);
 }
 
-static void syncsignalHandler(bool b, void *userData) {
-  timeSynced.store(b);
-  timesyncSet.store(true);
-
-  (void)userData;
+static
+void	syncsignalHandler	(bool b, void *userData) {
+    timeSynced. store (b);
+    timesyncSet. store (true);
+    (void)userData;
 }
 
 static long numSyncErr = 0, numFeErr = 0, numRsErr = 0, numAacErr = 0;
 static long numFicSyncErr = 0, numMp4CrcErr = 0;
 static int32_t totalDABframeCount = 0;
 
-static void decodeErrorReportHandler(int16_t errorType, int16_t numErr,
-                                     int32_t totalFrameCount, void *userData) {
-  if (!gotSampleData) return;  // ignore error until getting initial sample data
+static
+void	decodeErrorReportHandler (int16_t errorType,
+                              int16_t numErr,
+                              int32_t totalFrameCount, void *userData) {
+    if (!gotSampleData)
+       return;  // ignore error until getting initial sample data
 
   //	1: DAB _frame error
   //	2: Reed Solom correction failed
@@ -288,40 +307,45 @@ static void decodeErrorReportHandler(int16_t errorType, int16_t numErr,
   //	4: OFDM time/phase sync error
   //	5: FIC CRC error
   //	6: MP4/DAB+ CRC error
-  switch (errorType) {
-    case 1:
-      numFeErr += numErr;
-      totalDABframeCount = totalFrameCount;
-      break;
-    case 2:
-      numRsErr += numErr;
-      break;
-    case 3:
-      numAacErr += numErr;
-      break;
-    case 4:
-      numSyncErr += numErr;
-      break;
-    case 5:
-      numFicSyncErr += numErr;
-      break;
-    case 6:
-      numMp4CrcErr += numErr;
-      break;
-    default:;
-  }
+    switch (errorType) {
+       case 1:
+          numFeErr += numErr;
+          totalDABframeCount = totalFrameCount;
+          break;
+       case 2:
+          numRsErr += numErr;
+          break;
+          case 3:
+          numAacErr += numErr;
+          break;
+       case 4:
+          numSyncErr += numErr;
+          break;
+       case 5:
+          numFicSyncErr += numErr;
+          break;
+       case 6:
+          numMp4CrcErr += numErr;
+          break;
+       default:;
+    }
 }
 
-void printCollectedErrorStat(const char *txt) {
-  fprintf(infoStrm, "  decodeErrors:\n");
-  fprintf(infoStrm, "      OFDM frame sync errors:    %ld\n", numSyncErr);
-  fprintf(infoStrm, "      DAB frame errors (Fe):     %ld @ %ld (total)\n",
-          numFeErr, (long)totalDABframeCount);
-  fprintf(infoStrm, "      Reed Solomon errors (Rs):  %ld\n", numRsErr);
-  fprintf(infoStrm, "      AAC decode errors (Aac):   %ld\n", numAacErr);
-  fprintf(infoStrm, "      FIC CRC errors:            %ld\n", numFicSyncErr);
-  fprintf(infoStrm, "      MP4/DAB+ CRC errors:       %ld\n", numMp4CrcErr);
-  fprintf(infoStrm, "\n");
+void	printCollectedErrorStat (const char *txt) {
+    fprintf (infoStrm, "  decodeErrors:\n");
+    fprintf (infoStrm, "      OFDM frame sync errors:  %ld\n",
+                                                       numSyncErr);
+    fprintf (infoStrm, "      DAB frame errors (Fe):   %ld @ %ld (total)\n",
+                                   numFeErr, (long)totalDABframeCount);
+    fprintf (infoStrm, "      Reed Solomon errors (Rs): %ld\n",
+                                                       numRsErr);
+    fprintf (infoStrm, "      AAC decode errors (Aac): %ld\n",
+                                                       numAacErr);
+    fprintf (infoStrm, "      FIC CRC errors:          %ld\n",
+                                                       numFicSyncErr);
+    fprintf (infoStrm, "      MP4/DAB+ CRC errors:     %ld\n",
+                                                       numMp4CrcErr);
+    fprintf (infoStrm, "\n");
 }
 
 //
@@ -330,81 +354,95 @@ void printCollectedErrorStat(const char *txt) {
 //	the Boolean b tells whether or not an ensemble has been
 //	recognized, the names of the programs are in the
 //	ensemble
-static void ensemblenameHandler(std::string name, std::string abbr, int EId, void *userData) {
-  if (ensembleIdentifier != (uint32_t)EId || ensembleRecognized.load()) return;
-  fprintf(stderr,
-          "\n" FMT_DURATION
-          "ensemblenameHandler: '%s' / '%s' ensemble (EId %X) is "
-          "recognized\n\n" SINCE_START,
-          name.c_str(), abbr.c_str(), (uint32_t)EId);
-  ensembleName = name;
-  ensembleAbbr = abbr;
-  ensembleRecognized.store(true);
+static
+void	ensemblenameHandler (std::string name, std::string abbr,
+                                               int EId, void *userData) {
+    if (ensembleIdentifier != (uint32_t)EId ||
+                                ensembleRecognized.load())
+       return;
+
+    fprintf (stderr,
+             "\n" FMT_DURATION
+             "ensemblenameHandler: '%s' / '%s' ensemble (EId %X) is "
+             "recognized\n\n" SINCE_START,
+              name.c_str (), abbr.c_str (), (uint32_t)EId);
+    ensembleName = name;
+    ensembleAbbr = abbr;
+    ensembleRecognized. store (true);
 }
 
-static void ensembleIdHandler(int EId, void *userData) {
-  fprintf(stderr,
-          "\n" FMT_DURATION
-          "ensembleIdHandler: ensemble (EId %X) is recognized\n\n" SINCE_START,
-          (uint32_t)EId);
-  ensembleIdentifier = (uint32_t)EId;
+static
+void	ensembleIdHandler (int EId, void *userData) {
+    fprintf (stderr,
+             "\n" FMT_DURATION
+             "ensembleIdHandler: ensemble (EId %X) is recognized\n\n" SINCE_START,
+                                                (uint32_t)EId);
+    ensembleIdentifier = (uint32_t)EId;
 }
 
-static void programnameHandler(std::string s, std::string abbr, int SId, void *userdata) {
-  fprintf(stderr, "programnameHandler: '%s' / '%s' (SId %X) is part of the ensemble\n",
-          s.c_str(), abbr.c_str(), SId);
-  MyServiceData *d = new MyServiceData();
-  d->SId = SId;
-  d->programName = s;
-  d->programAbbr = abbr;
-  globals.channels[SId] = d;
+static
+void	programnameHandler (std::string s, std::string abbr,
+                                           int SId, void *userdata) {
+    fprintf (stderr,
+             "programnameHandler: '%s' / '%s' (SId %X) is part of the ensemble\n",
+            s.c_str (), abbr.c_str (), SId);
+    MyServiceData *d = new MyServiceData ();
+    d -> SId		= SId;
+    d -> programName	= s;
+    d -> programAbbr	= abbr;
+    globals.channels [SId] = d;
 
-  if ((SId == serviceIdentifier || useFirstProgramName) &&
-      !haveProgramNameForSID) {
-    programNameForSID = s;
-    haveProgramNameForSID = true;
-    serviceIdentifier = SId;
-    useFirstProgramName = false;
-  }
+    if ((SId == serviceIdentifier || useFirstProgramName) &&
+                                            !haveProgramNameForSID) {
+       programNameForSID		= s;
+       haveProgramNameForSID	= true;
+       serviceIdentifier		= SId;
+       useFirstProgramName		= false;
+    }
 }
 
-static void programdataHandler(audiodata *d, void *ctx) {
-  auto p = globals.channels.find(serviceIdentifier);
-  (void)ctx;
+static
+void	programdataHandler (audiodata *d, void *ctx) {
+    auto p = globals.channels. find (serviceIdentifier);
+    (void)ctx;
 
-  if (p != globals.channels.end() && d != NULL) {
-    p->second->audio = *d;
-    p->second->gotAudio = true;
-    fprintf(stderr, "programdataHandler for SID %X called. stored audiodata\n",
-            serviceIdentifier);
-  } else {
-    fprintf(stderr,
-            "programdataHandler for SID %X called. cannot save audiodata\n",
-            serviceIdentifier);
-  }
+    if ((p != globals.channels. end ()) && (d != NULL)) {
+       p -> second -> audio		= *d;
+       p -> second -> gotAudio	= true;
+       p -> second -> serviceLanguage = d->language; // Store language from API
+       fprintf (stderr,
+                "programdataHandler for SID %X called. stored audiodata\n",
+                                                   serviceIdentifier);
+    }
+    else {
+       fprintf (stderr,
+               "programdataHandler for SID %X called.cannot save audiodata\n",
+                                                      serviceIdentifier);
+    }
 }
 
 //
 //	The function is called from within the library with
 //	a string, the so-called dynamic label
-static void dataOut_Handler(std::string dynamicLabel, void *ctx) {
-  (void)ctx;
-  static std::string lastLabel;
-  if (lastLabel != dynamicLabel) {
-    fprintf(stderr, "dataOut: dynamicLabel = '%s'\n", dynamicLabel.c_str());
-    lastLabel = dynamicLabel;
-  }
+static
+void	dataOut_Handler (std::string dynamicLabel, void *ctx) {
+    (void)ctx;
+    static std::string lastLabel;
+    if (lastLabel != dynamicLabel) {
+       fprintf (stderr, "dataOut: dynamicLabel = '%s'\n",
+                                        dynamicLabel.c_str ());
+       lastLabel = dynamicLabel;
+    }
 }
 //
 //	The function is called from the MOT handler, with
 //	as parameters the filename where the picture is stored
 //	d denotes the subtype of the picture
 //	typedef void (*motdata_t)(std::string, int, void *);
-void motdataHandler(std::string s, int d, void *ctx) {
-  (void)s;
-  (void)d;
-  (void)ctx;
-  fprintf(stderr, "motdataHandler: %s\n", s.c_str());
+static
+void	motdataHandler (std::string s, int d, void *ctx) {
+    (void)s; (void)d; (void)ctx;
+    fprintf (stderr, "motdataHandler: %s\n", s.c_str ());
 }
 
 //
@@ -419,26 +457,27 @@ void motdataHandler(std::string s, int d, void *ctx) {
 //	and 0xFF for frametype 1
 //	Note that the callback function is executed in the thread
 //	that executes the tdcHandler code.
-static void bytesOut_Handler(uint8_t *data, int16_t amount, uint8_t type,
-                             void *ctx) {
+static
+void	bytesOut_Handler (uint8_t *data, int16_t amount,
+                                            uint8_t type, void *ctx) {
+    (void)ctx;
 #ifdef DATA_STREAMER
-  uint8_t localBuf[amount + 8];
-  int16_t i;
-  localBuf[0] = 0xFF;
-  localBuf[1] = 0x00;
-  localBuf[2] = 0xFF;
-  localBuf[3] = 0x00;
-  localBuf[4] = (amount >> 8) & 0xFF;
-  localBuf[5] = amount & 0xFF;
-  localBuf[6] = 0x00;
-  localBuf[7] = type == 0 ? 0 : 0xFF;
-  for (i = 0; i < amount; i++) localBuf[8 + i] = data;
-  tdcServer.sendData(localBuf, amount + 8);
+    uint8_t localBuf[amount + 8];
+    localBuf [0] = 0xFF;
+    localBuf [1] = 0x00;
+    localBuf [2] = 0xFF;
+    localBuf [3] = 0x00;
+    localBuf [4] = (amount >> 8) & 0xFF;
+    localBuf [5] = amount & 0xFF;
+    localBuf [6] = 0x00;
+    localBuf [7] = type == 0 ? 0 : 0xFF;
+
+    for (uint16_t i = 0; i < amount; i++)
+       localBuf [8 + i] = data[i]; // Fixed: was data (pointer)
+    tdcServer. sendData (localBuf, amount + 8);
 #else
-  (void)data;
-  (void)amount;
+    (void)data; (void)amount;
 #endif
-  (void)ctx;
 }
 
 //
@@ -447,138 +486,160 @@ static void bytesOut_Handler(uint8_t *data, int16_t amount, uint8_t type,
 //	audiohandler, based on portaudio. Feel free to modify this
 //	and send the samples elsewhere
 //
-static void pcmHandler(int16_t *buffer, int size, int rate, bool isStereo,
-                       void *ctx) {
-  if (scanOnly) return;
+static
+void	pcmHandler (int16_t *buffer, int size,
+                                int rate, bool isStereo, void *ctx) {
 
-  const int smpFrames = size / 2;
+    if (scanOnly)
+       return;
 
-  if (outWaveFilename) {
-    audioSink = fopen(outWaveFilename, "wb");
-    if (!audioSink) {
-      fprintf(stderr, "Failed to open %s\n", outWaveFilename);
-      exit(1);
+    const int smpFrames = size / 2;
+    if (outWaveFilename) {
+       audioSink = fopen (outWaveFilename, "wb");
+       if (!audioSink) {
+          fprintf(stderr, "Failed to open %s\n", outWaveFilename);
+          exit(1);
+       }
+
+       fprintf (stderr, "Open %s for write with samplerate %d in %s\n",
+                                    outWaveFilename, rate,
+                                    (isStereo ? "stereo" : "mono"));
+//	the data buffer[] is always delivered as stereo signal;
+//	mono with right == left channel
+       waveWriteHeader (rate, outFrequency, 16,
+                             2 /*(isStereo ? 2:1)*/, audioSink);
+       outWaveFilename = nullptr;
+       gotSampleData = true;
+
+       recStereo = isStereo;
+       haveStereo = true;
+       recRate = rate;
+
+       msecs_smp_start		= currentMSecsSinceEpoch ();
+       num_samples_since_start	= 0;
+       num_samples_next_check	=
+                 num_samples_per_check = rate / 2;  // every 0.5 sec
+       print_mismatch_counter	= 0;
     }
-    fprintf(stderr, "Open %s for write with samplerate %d in %s\n",
-            outWaveFilename, rate, (isStereo ? "stereo" : "mono"));
-    // the data buffer[] is always delivered as stereo signal; mono with right
-    // == left channel
-    waveWriteHeader(rate, outFrequency, 16, 2 /*(isStereo ? 2:1)*/, audioSink);
-    outWaveFilename = nullptr;
-    gotSampleData = true;
 
-    recStereo = isStereo;
-    haveStereo = true;
-    recRate = rate;
-
-    msecs_smp_start = currentMSecsSinceEpoch();
-    num_samples_since_start = 0;
-    num_samples_next_check = num_samples_per_check = rate / 2;  // every 0.5 sec
-    print_mismatch_counter = 0;
-  }
-  if (recDuration > 0) {
-    recDurationSmp = recDuration * rate;
-    recDuration = -1.0;
-  }
-
-  if (recRate != rate && outWaveFilename) {
-    fprintf(stderr,
-            "abort recording, because samplerate changed from %d to %d. "
-            "terminating!\n",
-            recRate, rate);
-    run.store(false);
-    return;
-  } else if (recStereo != isStereo && outWaveFilename) {
-    fprintf(stderr,
-            "abort recording, because stereo flag changed from %s to %s. "
-            "terminating!\n",
-            recStereo ? "true" : "false", isStereo ? "true" : "false");
-    run.store(false);
-    return;
-  }
-
-  static uint64_t lastRecSeconds = 0;
-  uint64_t recSeconds = num_samples_since_start / uint64_t(rate);
-  if (recSeconds != lastRecSeconds) {
-    double recSecs = (double)(num_samples_since_start / uint64_t(rate));
-    fprintf(stderr, "time: %.1f sec\n", recSecs);
-    lastRecSeconds = recSeconds;
-  }
-
-  static long lastSumDecErrs = 0;
-  if (num_samples_since_start >= num_samples_next_check && outWaveFilename) {
-    msecs_smp_curr = currentMSecsSinceEpoch();
-    uint64_t msecs_delta = msecs_smp_curr - msecs_smp_start;
-    uint64_t msecs_num_smp =
-        (num_samples_since_start * uint64_t(1000)) / uint64_t(rate);
-    long msecs_mismatch = (long)(msecs_num_smp - msecs_delta);
-    ++print_mismatch_counter;
-    if (print_mismatch_counter >= 20 || msecs_mismatch >= 100 ||
-        msecs_mismatch <= -100) {
-      // print once in 10 secs (== 20 iterations with 500 msec) .. or if
-      // |mismatch| >= 100 ms
-      fprintf(stderr,
-              "mismatch from system time to #samples @ rate == %ld ms\n",
-              msecs_mismatch);
-      print_mismatch_counter = 0;
+    if (recDuration > 0) {
+       recDurationSmp = recDuration * rate;
+       recDuration = -1.0;
     }
-    // if ( recTolerance > 0 && (msecs_mismatch >= recTolerance ||
-    // msecs_mismatch <= -recTolerance) ) { 	fprintf (stderr, "abort
-    // recording,
-    // because mismatch is too big. terminating!\n"); 	run. store (false);
-    //}
-    num_samples_next_check += num_samples_per_check;
 
-    long sumDecErrs = numSyncErr + numFeErr + numRsErr + numAacErr +
-                      numFicSyncErr + numMp4CrcErr;
-    if (lastSumDecErrs != sumDecErrs) {
-      fprintf(infoStrm,
-              "decodeErrors:\tSync %ld\tFe %ld @ %ld\tRs %ld\tAac %ld\tFicCRC "
-              "%ld\tMp4CRC %ld\n",
-              numSyncErr, numFeErr, (long)totalDABframeCount, numRsErr,
-              numAacErr, numFicSyncErr, numMp4CrcErr);
-      lastSumDecErrs = sumDecErrs;
+    if ((recRate != rate) && (outWaveFilename)) {
+       fprintf (stderr,
+                "abort recording: samplerate changed from %d to %d. "
+                "terminating!\n",
+                                              recRate, rate);
+       run.store(false);
+       return;
+    }
 
-      if (recTolerance > 0) {
-        if (numSyncErr) {
-          fprintf(stderr,
-                  "abort recording, because of OFDM frame sync error. "
-                  "terminating!\n");
+    if ((recStereo != isStereo) && outWaveFilename) {
+       fprintf (stderr,
+                    "abort recording: stereo flag changed from %s to %s. "
+                "terminating!\n",
+                             recStereo ? "true" : "false",
+                                  isStereo ? "true" : "false");
+       run.store(false);
+       return;
+    }
+
+    static
+    uint64_t lastRecSeconds	= 0;
+    uint64_t recSeconds	= num_samples_since_start / uint64_t (rate);
+
+    if (recSeconds != lastRecSeconds) {
+       double recSecs = (double)(num_samples_since_start / uint64_t(rate));
+       fprintf(stderr, "time: %.1f sec\n", recSecs);
+       lastRecSeconds = recSeconds;
+    }
+
+    static long lastSumDecErrs = 0;
+    if ((num_samples_since_start >= num_samples_next_check) &&
+                                               outWaveFilename) {
+       msecs_smp_curr	= currentMSecsSinceEpoch ();
+       uint64_t msecs_delta	= msecs_smp_curr - msecs_smp_start;
+       uint64_t msecs_num_smp	=
+              (num_samples_since_start * uint64_t(1000)) / uint64_t(rate);
+       long msecs_mismatch	= (long)(msecs_num_smp - msecs_delta);
+
+       ++print_mismatch_counter;
+       if ((print_mismatch_counter >= 20) ||
+           (msecs_mismatch >= 100) ||
+           (msecs_mismatch <= -100)) {
+//	print once in 10 secs (== 20 iterations with 500 msec) ..
+//	or if |mismatch| >= 100 ms
+          fprintf (stderr,
+                "mismatch from system time to #samples @ rate == %ld ms\n",
+                                                     msecs_mismatch);
+           print_mismatch_counter = 0;
+       }
+
+//	   if ((recTolerance > 0) && 
+//	    ((msecs_mismatch >= recTolerance) || (msecs_mismatch <= -recTolerance)) {
+//	      fprintf (stderr,
+//	        "abort recording, because mismatch is too big. terminating!\n");
+//	      run. store (false);
+//	   }
+
+       num_samples_next_check += num_samples_per_check;
+
+       long sumDecErrs	= numSyncErr + numFeErr +
+                              numRsErr + numAacErr +
+                              numFicSyncErr + numMp4CrcErr;
+
+       if (lastSumDecErrs != sumDecErrs) {
+          fprintf (infoStrm,
+                    "decodeErrors:\tSync %ld\tFe %ld @ %ld\tRs %ld\tAac %ld\tFicCRC "
+                    "%ld\tMp4CRC %ld\n",
+                                   numSyncErr, numFeErr,
+                                   (long)totalDABframeCount, numRsErr,
+                                   numAacErr, numFicSyncErr, numMp4CrcErr);
+          lastSumDecErrs = sumDecErrs;
+
+          if (recTolerance > 0) {
+             if (numSyncErr) {
+                fprintf (stderr,
+                              "abort recording, because of OFDM frame sync error. "
+                              "terminating!\n");
+                nextOut = timeOut;
+                printCollectedCallbackStat ("OFDM frame sync error", 1);
+                printCollectedErrorStat   ("OFDM frame sync error");
+                run. store (false);
+             } else
+             if (numFeErr &&
+                     (long)numFeErr * 100L >= (long)totalDABframeCount) {
+                fprintf (stderr,
+                              "abort recording, because DAB frame error count >= "
+                              "1%%. terminating!\n");
+                    nextOut = timeOut;
+                printCollectedCallbackStat ("DAB frame error count >= 1%", 1);
+                printCollectedErrorStat ("DAB frame error count >= 1%");
+                run.store(false);
+             }
+          }
+       }
+    }
+    num_samples_since_start += smpFrames;  //( size / (isStereo ? 2 : 1) );
+
+//	output rate, isStereo once
+    fwrite ((void *)buffer, size * 2, 1, audioSink);
+    waveDataSize += size * 2;
+
+    if (recDurationSmp) {
+//	   int sz = isStereo ? (size /2) : size;
+       if (recDurationSmp > (uint32_t)smpFrames)
+          recDurationSmp -= smpFrames;
+       else {
+          fprintf (stderr, "recording duration reached, terminating!\n");
           nextOut = timeOut;
-          printCollectedCallbackStat("OFDM frame sync error", 1);
-          printCollectedErrorStat("OFDM frame sync error");
-          run.store(false);
-        } else if (numFeErr &&
-                   (long)numFeErr * 100L >= (long)totalDABframeCount) {
-          fprintf(stderr,
-                  "abort recording, because DAB frame error count >= "
-                  "1%%. terminating!\n");
-          nextOut = timeOut;
-          printCollectedCallbackStat("DAB frame error count >= 1%", 1);
-          printCollectedErrorStat("DAB frame error count >= 1%");
-          run.store(false);
-        }
-      }
+          printCollectedCallbackStat ("recording duration reached", 1);
+          printCollectedErrorStat("recording duration reached");
+          run. store (false);
+       }
     }
-  }
-  num_samples_since_start += smpFrames;  //( size / (isStereo ? 2 : 1) );
-
-  // output rate, isStereo once
-  fwrite((void *)buffer, size, 2, audioSink);
-  waveDataSize += size * 2;
-
-  if (recDurationSmp) {
-    // int sz = isStereo ? (size /2) : size;
-    if (recDurationSmp > (uint32_t)smpFrames)
-      recDurationSmp -= smpFrames;
-    else {
-      fprintf(stderr, "recording duration reached, terminating!\n");
-      nextOut = timeOut;
-      printCollectedCallbackStat("recording duration reached", 1);
-      printCollectedErrorStat("recording duration reached");
-      run.store(false);
-    }
-  }
 }
 
 static bool stat_gotSysData = false, stat_gotFic = false, stat_gotMsc = false;
@@ -592,26 +653,28 @@ static int16_t stat_minFe = 0, stat_maxFe = 0;
 static int16_t stat_minRsE = 0, stat_maxRsE = 0;
 static int16_t stat_minAacE = 0, stat_maxAacE = 0;
 
-static void systemData(bool flag, int16_t snr, int32_t freqOff, void *ctx) {
-  if (stat_gotSysData) {
-    stat_everSynced = stat_everSynced || flag;
-    stat_minSnr = snr < stat_minSnr ? snr : stat_minSnr;
-    stat_maxSnr = snr > stat_maxSnr ? snr : stat_maxSnr;
-  } else {
-    stat_everSynced = flag;
-    stat_minSnr = stat_maxSnr = snr;
-  }
+static
+void	systemData (bool flag, int16_t snr, int32_t freqOff, void *ctx) {
+    if (stat_gotSysData) {
+       stat_everSynced	= stat_everSynced || flag;
+       stat_minSnr		= snr < stat_minSnr ? snr : stat_minSnr;
+       stat_maxSnr		= snr > stat_maxSnr ? snr : stat_maxSnr;
+    } else {
+       stat_everSynced = flag;
+        stat_minSnr = stat_maxSnr = snr;
+    }
 
-  ++numSnr;
-  sumSnr += snr;
-  avgSnr = sumSnr / numSnr;
-  stat_gotSysData = true;
+    ++numSnr;
+    sumSnr += snr;
+    avgSnr = sumSnr / numSnr;
+    stat_gotSysData = true;
 
-  //	fprintf (stderr, "synced = %s, snr = %d, offset = %d\n",
-  //	                    flag? "on":"off", snr, freqOff);
+//	fprintf (stderr, "synced = %s, snr = %d, offset = %d\n",
+//	                    flag? "on":"off", snr, freqOff);
 }
 
-static void tii(int16_t mainId, int16_t subId, unsigned tii_num, void *ctx) {
+static
+void tii(int16_t mainId, int16_t subId, unsigned tii_num, void *ctx) {
   ++numAllTii;
   if (mainId >= 0) {
     int combinedId = mainId * 100 + subId;
@@ -780,7 +843,7 @@ static FILE *ficFile = NULL;
 static unsigned fibCallbackNo = 0;
 
 static void fib_dataHandler(const uint8_t *fib, int crc_ok, void *ud) {
-  (void)crc_ok;
+  (void)ud; (void)crc_ok;
   if (ficFile) fwrite(fib, 32, 1, ficFile);
   ++fibCallbackNo;
 
@@ -860,66 +923,68 @@ void allocateDevice(bool openDevice = false, int32_t frequency = 0,
 
 
 static inline
-int32_t timeOutIncGranularity() {
-  double off = ( theDevice ) ? theDevice->currentOffset() : -1.0;
-  if ( off < 0 )
-    timeOut += T_GRANULARITY;
-  else
-    timeOut = (int32_t)( off * T_UNIT_MUL );
-  return timeOut;
+int32_t timeOutIncGranularity () {
+    double off = (theDevice != NULL)?
+                           theDevice -> currentOffset () : -1.0;
+    if (off < 0  )
+       timeOut += T_GRANULARITY;
+    else
+       timeOut = (int32_t)(off * T_UNIT_MUL);
+    return timeOut;
 }
 
-int main(int argc, char **argv) {
-  msecs_progStart = currentMSecsSinceEpoch();  // for  long sinceStart()
-  // Default values
-  uint8_t theMode = 1;
-  std::string theChannel = "11C";
-  uint8_t theBand = BAND_III;
-  int16_t ppmCorrection = 0;
-  int theGain = 35;  // scale = 0 .. 100
+int	main (int argc, char **argv) {
+    msecs_progStart = currentMSecsSinceEpoch();  // for  long sinceStart()
+// Default values
 
-  int32_t waitingTime = 10 * T_UNIT_MUL;
-  int32_t waitingTimeInit = 10 * T_UNIT_MUL;
-  int32_t waitAfterEnsemble = -1;
-  float init_freq_offset = 0.0F;
-  int verbosity = 0;
+    uint8_t theMode		= 1;
+    std::string theChannel	= "11C";
+    uint8_t theBand		= BAND_III;
+    int16_t ppmCorrection	= 0;
+    int	theGain		= 35;  // scale = 0 .. 100
 
-  bool autogain = false;
-  bool printAsCSV = false;
-  int tii_framedelay = 10;
-  float tii_alfa = 0.9F;
-  int tii_resetFrames = 10;
-  bool useExTii = false;
-  const char *rtlOpts = NULL;
+    int32_t waitingTime	= 10 * T_UNIT_MUL;
+    int32_t waitingTimeInit = 10 * T_UNIT_MUL;
+    int32_t waitAfterEnsemble = -1;
+    float init_freq_offset	= 0.0F;
+    int	verbosity	= 0;
 
-  int opt;
-  struct sigaction sigact;
-  bandHandler dabBand;
+    bool	autogain	= false;
+    bool	printAsCSV	= false;
+    int	tii_framedelay	= 10;
+    float	tii_alfa	= 0.9F;
+    int	tii_resetFrames = 10;
+    bool	useExTii	= false;
+    const char *rtlOpts	= nullptr;
+
+    int opt;
+    struct sigaction sigact;
+    bandHandler dabBand;
 #if defined(HAVE_WAVFILES) || defined(HAVE_RAWFILES)
-  std::string fileName;
-  double fileOffset = 0.0;
+    std::string fileName;
+    double fileOffset	= 0.0;
 #elif HAVE_RTL_TCP
-  std::string hostname = "127.0.0.1";  // default
-  int32_t basePort = 1234;             // default
+    std::string hostname	= "127.0.0.1";  // default
+    int32_t basePort	= 1234;		// default
 #endif
 #if defined(HAVE_RTLSDR)
-  int deviceIndex = 0;
-  const char *deviceSerial = nullptr;
+    int deviceIndex		= 0;
+    const char *deviceSerial = nullptr;
 #endif
 
-  fprintf(stderr,
-          "dab_cmdline example-10 V 1.0alfa,\n \
-	                  Copyright 2018 Hayati Ayguen/Jan van Katwijk\n");
-  timeSynced.store(false);
-  timesyncSet.store(false);
-  run.store(false);
+    fprintf (stderr,
+             "dab_cmdline example-10 V 1.1,\n \
+                      Copyright 2018-2026 Hayati Ayguen/Jan van Katwijk\n");
+    timeSynced. store (false);
+    timesyncSet. store (false);
+    run. store	(false);
 
-  if (argc == 1) {
-    printOptions();
-    exit(1);
-  }
+    if (argc == 1) {
+       printOptions ();
+       exit (1);
+    }
 
-  audioSink = stdout;
+    audioSink = stdout;
 
 //	For file input we do not need options like Q, G and C,
 //	We do need an option to specify the filename
@@ -945,712 +1010,699 @@ int main(int argc, char **argv) {
 
 #if 0
     {
-        bool ok = testGetBits();
+        bool ok = testGetBits ();
         if (!ok)
             return 1;
     }
 #endif
 
-  while (
-      (opt = getopt(argc, argv,
+    while (
+          (opt = getopt(argc, argv,
                     "W:A:M:B:P:p:T:S:E:cft:a:r:xO:w:n:z:v" FILE_OPTS NON_FILE_OPTS
                         RTLSDR_OPTS RTL_TCP_OPTS)) != -1) {
-    fprintf(stderr, "opt = %c\n", opt);
-    switch (opt) {
-      case 'W':
-        waitingTimeInit = waitingTime = int32_t(atoi(optarg));
-        fprintf(stderr, "read option -W : max time to aquire sync is %d %s\n",
-                int(waitingTime), T_UNITS);
-        break;
+       fprintf(stderr, "opt = %c\n", opt);
 
-      case 'z':
-        init_freq_offset = atof(optarg);
-        fprintf(stderr, "read option -z: initial frequency offset %f\n", init_freq_offset);
-        break;
-
-      case 'v':
-        ++verbosity;
-        break;
-
-      case 'A':
-        waitAfterEnsemble = int32_t(atoi(optarg));
-        fprintf(
-            stderr,
-            "read option -A : additional time after sync to aquire ensemble "
-            "is %d %s\n",
-            int(waitAfterEnsemble), T_UNITS);
-        break;
-
-      case 'E':
-        scanOnly = true;
-        infoStrm = stdout;
-        minSNRtoExit = int16_t(atoi(optarg));
-        fprintf(stderr, "read option -E : scanOnly .. with minSNR %d\n",
-                minSNRtoExit);
-        break;
-
-      case 'c':
-        printAsCSV = true;
-        break;
-
-      case 'f':
-        ficFile = fopen("ficdata.fic", "wb");
-        break;
-
-      case 't':
-        tii_framedelay = atoi(optarg);
-        fprintf(stderr, "read option -t : tii framedelay %d\n", tii_framedelay);
-        break;
-
-      case 'a':
-        tii_alfa = atof(optarg);
-        fprintf(stderr, "read option -a : tii alfa %f\n", tii_alfa);
-        break;
-
-      case 'r':
-        tii_resetFrames = atoi(optarg);
-        fprintf(stderr, "read option -r : tii resetFrames %d\n",
-                tii_resetFrames);
-        break;
-
-      case 'x':
-        useExTii = !useExTii;
-        fprintf(stderr, "read option -x : using %s Tii algorithm\n",
-                (useExTii ? "extended" : "Jan's"));
-        break;
-
-      case 'M':
-        theMode = atoi(optarg);
-        if (!((theMode == 1) || (theMode == 2) || (theMode == 4))) theMode = 1;
-        break;
-
-      case 'B':
-        theBand =
-            std::string(optarg) == std::string("L_BAND") ? L_BAND : BAND_III;
-        break;
-
-      case 'P':
-        programName = optarg;
-        serviceIdentifier = -1;
-        useFirstProgramName = false;
-        fprintf(stderr, "read option -P : tune to program '%s'\n", optarg);
-        break;
-
-      case 'p':
-        ppmCorrection = atoi(optarg);
-        break;
-
-      case 'T':
-        recTolerance = atoi(optarg);
-        break;
-
-      case 'O':
-        rtlOpts = optarg;
-        break;
+       switch (opt) {
+          case 'W':
+             waitingTimeInit = waitingTime = int32_t (atoi(optarg));
+             break;
+          case 'z':
+             init_freq_offset = atof(optarg);
+             break;
+          case 'v':
+             ++verbosity;
+             break;
+          case 'A':
+             waitAfterEnsemble = int32_t(atoi(optarg));
+             break;
+          case 'E':
+             scanOnly = true;
+             infoStrm = stdout;
+             minSNRtoExit = int16_t (atoi (optarg));
+             fprintf (stderr,
+                     "read option -E : scanOnly .. with minSNR %d\n",
+                                                         minSNRtoExit);
+             break;
+          case 'c':
+             printAsCSV = true;
+             break;
+          case 'f':
+             ficFile = fopen ("ficdata.fic", "wb");
+             break;
+          case 't':
+             tii_framedelay = atoi(optarg);
+             fprintf (stderr,
+                    "read option -t : tii framedelay %d\n", tii_framedelay);
+             break;
+          case 'a':
+             tii_alfa = atof (optarg);
+             fprintf (stderr, "read option -a : tii alfa %f\n", tii_alfa);
+             break;
+          case 'r':
+             tii_resetFrames = atoi (optarg);
+             fprintf (stderr,
+                     "read option -r : tii resetFrames %d\n",
+                                                   tii_resetFrames);
+             break;
+          case 'x':
+             useExTii = !useExTii;
+             fprintf (stderr,
+                      "read option -x : using %s Tii algorithm\n",
+                                     (useExTii ? "extended" : "Jan's"));
+             break;
+          case 'M':
+             theMode = atoi(optarg);
+             if (!((theMode == 1) || (theMode == 2) ||
+                                  (theMode == 4)))
+                theMode = 1;
+             break;
+          case 'B':
+             theBand =
+                   std::string (optarg) == std::string ("L_BAND") ?
+                                                     L_BAND : BAND_III;
+             break;
+          case 'P':
+             programName		= optarg;
+             serviceIdentifier	= -1;
+             useFirstProgramName	= false;
+             break;
+          case 'p':
+             ppmCorrection = atoi (optarg);
+             break;
+          case 'T':
+             recTolerance = atoi (optarg);
+             break;
+          case 'O':
+             rtlOpts = optarg;
+             break;
 
 #if defined(HAVE_WAVFILES) || defined(HAVE_RAWFILES)
-      case 'F':
-        fileName = std::string(optarg);
-        break;
-      case 'R':
-        repeater = false;
-        break;
-      case 'o':
-        fileOffset = atof(optarg);
-        break;
+          case 'F':
+             fileName = std::string (optarg);
+             break;
+          case 'R':
+             repeater = false;
+             break;
+          case 'o':
+             fileOffset = atof (optarg);
+             break;
 #else
-      case 'C':
-        theChannel = std::string(optarg);
-        break;
-
-      case 'G':
-        theGain = atoi(optarg);
-        break;
-
-      case 'Q':
-        autogain = true;
-        break;
+          case 'C':
+             theChannel = std::string (optarg);
+             break;
+          case 'G':
+             theGain = atoi (optarg);
+             break;
+          case 'Q':
+             autogain = true;
+             break;
 #if defined(HAVE_RTLSDR)
-      case 'd':
-        deviceIndex = atoi(optarg);
-        break;
-
-      case 's':
-        deviceSerial = optarg;
-        break;
+          case 'd':
+             deviceIndex = atoi (optarg);
+             break;
+          case 's':
+             deviceSerial = optarg;
+             break;
 #endif
 #ifdef HAVE_RTL_TCP
-      case 'H':
-        hostname = std::string(optarg);
-        break;
-
-      case 'I':
-        basePort = atoi(optarg);
-        break;
+          case 'H':
+             hostname = std::string (optarg);
+             break;
+          case 'I':
+             basePort = atoi(optarg);
+             break;
 #endif
 #endif
-      case 'S': {
-        std::stringstream ss;
-        ss << std::hex << optarg;
-        ss >> serviceIdentifier;
-        if (ss) programName.clear();
-        useFirstProgramName = false;
-        fprintf(stderr, "read option -S : tune to program SId '%X'\n",
-                serviceIdentifier);
-        break;
-      }
+          case 'S': {
+             std::stringstream ss;
+             ss << std::hex << optarg;
+             ss >> serviceIdentifier;
+             if (ss)
+                programName.clear ();
+             useFirstProgramName = false;
+             fprintf (stderr, "read option -S : tune to program SId '%X'\n",
+                                                      serviceIdentifier);
+             break;
+          }
+          case 'w': 
+             outWaveFilename = optarg;
+             break;
+          case 'n': 
+             recDuration = atof (optarg);
+             break;
 
-      case 'w': {
-        outWaveFilename = optarg;
-        break;
-      }
-
-      case 'n': {
-        recDuration = atof(optarg);
-        break;
-      }
-
-      default:
-        printOptions();
-        exit(1);
+          default:
+             printOptions();
+             exit (1);
+       }
     }
-  }
   //
-  sigact.sa_handler = sighandler;
-  sigemptyset(&sigact.sa_mask);
-  sigact.sa_flags = 0;
-  sigaction(SIGINT, &sigact, nullptr);
+    sigact. sa_handler = sighandler;
+    sigemptyset (&sigact. sa_mask);
+    sigact.sa_flags = 0;
+    sigaction(SIGINT, &sigact, nullptr);
 
-  int32_t frequency = dabBand.Frequency(theBand, theChannel);
-  outFrequency = frequency;
+    int32_t frequency = dabBand.Frequency (theBand, theChannel);
+    outFrequency = frequency;
 
-  allocateDevice(true, frequency, ppmCorrection, theGain, autogain,
+    allocateDevice (true, frequency, ppmCorrection, theGain, autogain,
 #if defined(HAVE_RTLSDR)
-                 deviceIndex, deviceSerial,
+                    deviceIndex, deviceSerial,
 #else
-                 0, NULL,
+                    0, NULL,
 #endif
-                 rtlOpts,
+                    rtlOpts,
 #if defined(HAVE_WAVFILES) || defined(HAVE_RAWFILES)
-                 &fileName, fileOffset,
+                    &fileName, fileOffset,
 #else
-                 NULL, 0.0,
+                    NULL, 0.0,
 #endif
 #ifdef HAVE_RTL_TCP
-                 hostname, basePort
+                    hostname, basePort
 #else
-                 NULL, 0
+                    NULL, 0
 #endif
-  );
+    );
 
-  if (!theDevice) {
+    if (!theDevice) {
 #if PRINT_DURATION
-    fprintf(stderr,
-            "\n" FMT_DURATION
-            "exiting main() for failed device allocation\n" SINCE_START);
+       fprintf (stderr,
+                "\n" FMT_DURATION
+                "exiting main() for failed device allocation\n" SINCE_START);
 #endif
-    exit(32);
-  }
+       exit(32);
+    }
 
-  //
-  //	and with a sound device we now can create a "backend"
-  theRadio =
-      dabInit(theDevice, theMode, syncsignalHandler, systemData,
-              ensemblenameHandler, programnameHandler, fibQuality, pcmHandler,
-              dataOut_Handler, bytesOut_Handler, programdataHandler, mscQuality,
-              motdataHandler,  // MOT in PAD
-              NULL,            // no spectrum shown
-              NULL,            // no constellations
-              NULL,            // Ctx
-              init_freq_offset,
-              verbosity
-      );
-  if (theRadio == NULL) {
-    fprintf(stderr, "sorry, no radio available, fatal\n");
-    nextOut = timeOut;
-    printCollectedCallbackStat("A: no radio");
+//
+//	and with a sound device we now can create a "backend"
+    theRadio =
+            dabInit (theDevice, theMode,
+                     syncsignalHandler, systemData,
+                     ensemblenameHandler, programnameHandler,
+                     fibQuality, pcmHandler,
+                     dataOut_Handler, bytesOut_Handler,
+                     programdataHandler, mscQuality,
+                     motdataHandler,  // MOT in PAD
+                     NULL,            // no spectrum shown
+                     NULL,            // no constellations
+                     NULL,            // Ctx
+                     init_freq_offset,
+                     verbosity
+                   );
+
+    if (theRadio == NULL) {
+       fprintf (stderr, "sorry, no radio available, fatal\n");
+       nextOut = timeOut;
+       printCollectedCallbackStat ("A: no radio");
 #if PRINT_DURATION
-    fprintf(stderr, "\n" FMT_DURATION "exiting main()\n" SINCE_START);
+       fprintf (stderr, "\n" FMT_DURATION "exiting main()\n" SINCE_START);
 #endif
-    exit(4);
-  }
+       exit(4);
+    }
 
-  if (useExTii)
-    dab_setTII_handler(theRadio, nullptr, tiiEx, tii_framedelay, tii_alfa,
-                       tii_resetFrames);
-  else
-    dab_setTII_handler(theRadio, tii, nullptr, tii_framedelay, tii_alfa,
-                       tii_resetFrames);
+    if (useExTii)
+       dab_setTII_handler (theRadio, nullptr,
+                           tiiEx, tii_framedelay, tii_alfa,
+                           tii_resetFrames);
+    else
+       dab_setTII_handler (theRadio, tii, nullptr,
+                           tii_framedelay, tii_alfa,
+                           tii_resetFrames);
 
-  dab_setEId_handler(theRadio, ensembleIdHandler);
-  dab_setError_handler(theRadio, decodeErrorReportHandler);
-  dab_setFIB_handler(theRadio, fib_dataHandler);
+    dab_setEId_handler	(theRadio, ensembleIdHandler);
+    dab_setError_handler	(theRadio, decodeErrorReportHandler);
+    dab_setFIB_handler	(theRadio, fib_dataHandler);
 
-  theDevice->setGain(theGain);
-  if (autogain) theDevice->set_autogain(autogain);
-  theDevice->restartReader(frequency);
+    theDevice	-> setGain (theGain);
+    if (autogain)
+       theDevice -> set_autogain (autogain);
+    theDevice -> restartReader(frequency);
   //
   //	The device should be working right now
 
-  timesyncSet.store(false);
-  ensembleRecognized.store(false);
-  fprintf(stderr, "\n" FMT_DURATION "starting DAB processing ..\n" SINCE_START);
-  dabStartProcessing(theRadio);
+    timesyncSet. store (false);
+    ensembleRecognized. store (false);
+    fprintf (stderr,
+            "\n" FMT_DURATION "starting DAB processing ..\n" SINCE_START);
 
-  bool abortForSnr = false;
-  bool continueForFullEnsemble = false;
+    dabStartProcessing (theRadio);
+    bool abortForSnr		= false;
+    bool continueForFullEnsemble	= false;
 
-#if PRINT_LOOPS
-  fprintf(
-      stderr,
-      "\n" FMT_DURATION
-      "before while1: cont=%s, abort=%s, timeout=%d, waitTime=%d\n" SINCE_START,
-      continueForFullEnsemble ? "true" : "false",
-      abortForSnr ? "true" : "false", int(timeOut), int(waitingTime));
-#endif
-  while (timeOutIncGranularity() < waitingTime && !abortForSnr) {
-    if ((!ensembleRecognized.load() || continueForFullEnsemble) &&
-        timeOut > T_GRANULARITY)
-      sleepMillis(T_GRANULARITY);  // sleep (1);  // skip 1st sleep if possible
-    printCollectedCallbackStat("wait for timeSync ..");
-    if (scanOnly && numSnr >= 5 && avgSnr < minSNRtoExit) {
-      fprintf(
-          stderr,
-          FMT_DURATION
-          "abort because minSNR %d is not met. # is %ld avg %ld\n" SINCE_START,
-          int(minSNRtoExit), numSnr, avgSnr);
-      abortForSnr = true;
-      break;
-    }
+    while ((timeOutIncGranularity () < waitingTime) && !abortForSnr) {
+       if ((!ensembleRecognized.load() || continueForFullEnsemble) &&
+                                       (timeOut > T_GRANULARITY))
+          sleepMillis(T_GRANULARITY);
+//	sleep (1);  // skip 1st sleep if possible
+       printCollectedCallbackStat ("wait for timeSync ..");
+       if (scanOnly && (numSnr >= 5) && (avgSnr < minSNRtoExit)) {
+          fprintf (stderr,
+                   FMT_DURATION
+                   "abort because minSNR %d is not met. # is %ld avg %ld\n" SINCE_START,
+                                     int(minSNRtoExit), numSnr, avgSnr);
+          abortForSnr = true;
+          break;
+       }
 
-    if (waitingTime >= waitingTimeInit && ensembleRecognized.load()) {
-      const bool prevContinueForFullEnsemble = continueForFullEnsemble;
-      continueForFullEnsemble = true;
-      if (waitAfterEnsemble > 0) {
-        if (!prevContinueForFullEnsemble) {  // increase waitingTime only once
-          fprintf(stderr,
-                  "t=%d: abort later because already got ensemble data.\n",
-                  timeOut);
-          waitingTime = timeOut + waitAfterEnsemble;
-          fprintf(stderr,
-                  FMT_DURATION
-                  "waitAfterEnsemble = %d > 0  ==> waitingTime = timeOut + "
-                  "waitAfterEnsemble = %d + %d = %d\n" SINCE_START,
-                  waitAfterEnsemble, timeOut, waitAfterEnsemble, waitingTime);
-        }
-      } else if (waitAfterEnsemble == 0) {
-        fprintf(stderr,
-                "t=%d: abort directly because already got ensemble data.\n",
-                timeOut);
-        fprintf(stderr,
-                FMT_DURATION "waitAfterEnsemble == 0  ==> break\n" SINCE_START);
-        break;
-      }
-    }
-
-#if PRINT_LOOPS
-    fprintf(
-        stderr,
-        FMT_DURATION
-        "in while1: cont=%s, abort=%s, timeout=%d, waitTime=%d\n" SINCE_START,
-        continueForFullEnsemble ? "true" : "false",
-        abortForSnr ? "true" : "false", int(timeOut), int(waitingTime));
-#endif
-  }
-
-#if PRINT_LOOPS
-  fprintf(
-      stderr,
-      "\n" FMT_DURATION
-      "before while2: cont=%s, abort=%s, timeout=%d, waitTime=%d\n" SINCE_START,
-      continueForFullEnsemble ? "true" : "false",
-      abortForSnr ? "true" : "false", int(timeOut), int(waitingTime));
-#endif
-
-  while (continueForFullEnsemble && !abortForSnr &&
-         timeOutIncGranularity() < waitingTime) {
-    sleepMillis(T_GRANULARITY);
-    printCollectedCallbackStat("wait for full ensemble info..");
-    if (scanOnly && numSnr >= 5 && avgSnr < minSNRtoExit) {
-      fprintf(
-          stderr,
-          FMT_DURATION
-          "abort because minSNR %d is not met. # is %ld avg %ld\n" SINCE_START,
-          int(minSNRtoExit), numSnr, avgSnr);
-      abortForSnr = true;
-      break;
-    }
-#if PRINT_LOOPS
-    fprintf(
-        stderr,
-        FMT_DURATION
-        "in while2: cont=%s, abort=%s, timeout=%d, waitTime=%d\n" SINCE_START,
-        continueForFullEnsemble ? "true" : "false",
-        abortForSnr ? "true" : "false", int(timeOut), int(waitingTime));
-#endif
-  }
-
-  if (!timeSynced.load()) {
-    fprintf(stderr, FMT_DURATION
-            "There does not seem to be a DAB signal here\n" SINCE_START);
-    FAST_EXIT(22);
-    theDevice->stopReader();
-    dabStop(theRadio);
-    nextOut = timeOut;
-    printCollectedCallbackStat("B: no DAB signal");
-    dabExit(theRadio);
-    delete theDevice;
-#if PRINT_DURATION
-    fprintf(stderr, "\n" FMT_DURATION "exiting main()\n" SINCE_START);
-#endif
-    exit(22);
-  }
-
-#if PRINT_LOOPS
-  fprintf(
-      stderr,
-      "\n" FMT_DURATION
-      "before while3: cont=%s, abort=%s, timeout=%d, waitTime=%d\n" SINCE_START,
-      continueForFullEnsemble ? "true" : "false",
-      abortForSnr ? "true" : "false", int(timeOut), int(waitingTime));
-#endif
-  while (!ensembleRecognized.load() &&
-         (timeOutIncGranularity() < waitingTime) && !abortForSnr) {
-    sleepMillis(T_GRANULARITY);
-    printCollectedCallbackStat("C: collecting ensembleData ..");
-    if (scanOnly && numSnr >= 5 && avgSnr < minSNRtoExit) {
-      fprintf(
-          stderr,
-          FMT_DURATION
-          "abort because minSNR %d is not met. # is %ld avg %ld\n" SINCE_START,
-          int(minSNRtoExit), numSnr, avgSnr);
-      abortForSnr = true;
-      break;
-    }
-#if PRINT_LOOPS
-    fprintf(
-        stderr,
-        FMT_DURATION
-        "in while3: cont=%s, abort=%s, timeout=%d, waitTime=%d\n" SINCE_START,
-        continueForFullEnsemble ? "true" : "false",
-        abortForSnr ? "true" : "false", int(timeOut), int(waitingTime));
-#endif
-  }
-  fprintf(stderr, "\n");
-  if (abortForSnr) exit(24);
-  static int count = 10;
-
-  while (!scanOnly && !ensembleRecognized.load() && (--count > 0)) sleep(1);
-
-  if (!ensembleRecognized.load()) {
-    fprintf(stderr, FMT_DURATION "no ensemble data found, fatal\n" SINCE_START);
-    FAST_EXIT(22);
-    theDevice->stopReader();
-    dabStop(theRadio);
-    nextOut = timeOut;
-    printCollectedCallbackStat("D: no ensembleData");
-    dabExit(theRadio);
-    delete theDevice;
-#if PRINT_DURATION
-    fprintf(stderr, "\n" FMT_DURATION "exiting main()\n" SINCE_START);
-#endif
-    exit(22);
-  }
-
-  if (ensembleRecognized.load()) {
-    nextOut = timeOut;
-    if (!printAsCSV)
-      printCollectedCallbackStat("summmary for found ensemble", 1);
-  }
-
-  if (!scanOnly) {
-    audiodata ad;
-    packetdata pd;
-    run.store(true);
-    const std::string *pPlayProgName = &programName;
-    if (serviceIdentifier != -1) {
-      if (haveProgramNameForSID)
-        pPlayProgName = &programNameForSID;
-      else {
-        std::cerr << "sorry  we could not find program for given SID "
-                  << std::hex << serviceIdentifier << "\n";
-        run.store(false);
-      }
-    }
-
-    std::cerr << "we try to start service '" << *pPlayProgName << "'\n";
-    if (is_audioService(theRadio, pPlayProgName->c_str())) {
-      dataforAudioService(theRadio, pPlayProgName->c_str(), &ad, 0);
-      if (!ad.defined) {
-        std::cerr << "sorry  we cannot handle service '" << *pPlayProgName
-                  << "'\n";
-        run.store(false);
-      }
-    } else if (is_dataService(theRadio, pPlayProgName->c_str())) {
-      dataforDataService(theRadio, pPlayProgName->c_str(), &pd, 0);
-      if (!pd.defined) {
-        std::cerr << "sorry  we cannot handle service '" << *pPlayProgName
-                  << "'\n";
-        run.store(false);
-      }
-    } else {
-      std::cerr << "sorry, we cannot handle service '" << *pPlayProgName
-                << "'\n";
-      run.store(false);
-    }
-
-    if (run.load()) {
-      dabReset_msc(theRadio);
-      if (is_audioService(theRadio, pPlayProgName->c_str()))
-        set_audioChannel(theRadio, &ad);
-      else
-        set_dataChannel(theRadio, &pd);
-
-      int countGran = 0;
-      while (run.load()) {
-        timeOutIncGranularity();
-        sleepMillis(T_GRANULARITY);
-        printCollectedCallbackStat("E: loading ..");
-        // TODO: check for audio samples after some timeout!
-        if (countGran < 3000) {
-          countGran += T_GRANULARITY;
-          if (countGran >= 3000 && !gotSampleData && outWaveFilename) {
-            std::cerr << "abort after 3 sec without receiving sample data!\n";
-            run.store(false);
+       if ((waitingTime >= waitingTimeInit) &&
+                               (ensembleRecognized.load ())) {
+          const bool prevContinueForFullEnsemble = continueForFullEnsemble;
+          continueForFullEnsemble = true;
+          if (waitAfterEnsemble > 0) {
+             if (!prevContinueForFullEnsemble) {
+// increase waitingTime only once
+                fprintf (stderr,
+                         "t=%d: abort later because already got ensemble data.\n",
+                                                              timeOut);
+                waitingTime = timeOut + waitAfterEnsemble;
+                fprintf (stderr,
+                         FMT_DURATION
+                          "waitAfterEnsemble = %d > 0  ==> waitingTime = timeOut + "
+                          "waitAfterEnsemble = %d + %d = %d\n" SINCE_START,
+                                              waitAfterEnsemble,
+                                              timeOut, waitAfterEnsemble,
+                                                             waitingTime);
+             }
+          } else
+          if (waitAfterEnsemble == 0) {
+             fprintf (stderr,
+                      "t=%d: abort directly because already got ensemble data.\n",
+                                                                 timeOut);
+             fprintf(stderr,
+                   FMT_DURATION "waitAfterEnsemble == 0  ==> break\n" SINCE_START);
+             break;
           }
-        }
-      }
+       }
+    }
+
+    while (continueForFullEnsemble &&
+           !abortForSnr &&
+           (timeOutIncGranularity () < waitingTime)) {
+       sleepMillis (T_GRANULARITY);
+       printCollectedCallbackStat ("wait for full ensemble info..");
+       if ((scanOnly && numSnr >= 5) && (avgSnr < minSNRtoExit)) {
+          fprintf (stderr,
+                   FMT_DURATION
+                   "abort because minSNR %d is not met. # is %ld avg %ld\n" SINCE_START,
+                                     int(minSNRtoExit), numSnr, avgSnr);
+          abortForSnr = true;
+          break;
+       }
+    }
+
+    if (!timeSynced. load ()) {
+       fprintf (stderr, FMT_DURATION
+               "There does not seem to be a DAB signal here\n" SINCE_START);
+       FAST_EXIT (22);
+       theDevice -> stopReader ();
+       dabStop (theRadio);
+       nextOut = timeOut;
+       printCollectedCallbackStat ("B: no DAB signal");
+       dabExit(theRadio);
+       delete theDevice;
+#if PRINT_DURATION
+       fprintf (stderr, "\n" FMT_DURATION "exiting main()\n" SINCE_START);
+#endif
+       exit(22);
+    }
+
+    while (!ensembleRecognized. load () &&
+            (timeOutIncGranularity () < waitingTime) && !abortForSnr) {
+       sleepMillis (T_GRANULARITY);
+       printCollectedCallbackStat ("C: collecting ensembleData ..");
+       if (scanOnly && (numSnr >= 5) && (avgSnr < minSNRtoExit)) {
+          fprintf (stderr, FMT_DURATION
+                    "abort because minSNR %d is not met. # is %ld avg %ld\n" SINCE_START,
+                                       int (minSNRtoExit), numSnr, avgSnr);
+          abortForSnr = true;
+          break;
+       }
+    }
+
+    fprintf (stderr, "\n");
+    if (abortForSnr)
+       exit (24);
+    static int count = 10;
+
+    while (!scanOnly && !ensembleRecognized.load() &&
+                                            (--count > 0)) 
+       sleep (1);
+    if (!ensembleRecognized. load ()) {
+       fprintf (stderr,
+                FMT_DURATION "no ensemble data found, fatal\n" SINCE_START);
+       FAST_EXIT (22);
+       theDevice -> stopReader ();
+       dabStop (theRadio);
+       nextOut = timeOut;
+       printCollectedCallbackStat ("D: no ensembleData");
+       dabExit (theRadio);
+       delete theDevice;
+#if PRINT_DURATION
+       fprintf(stderr,
+                     "\n" FMT_DURATION "exiting main()\n" SINCE_START);
+#endif
+       exit(22);
+    }
+
+    if (ensembleRecognized. load ()) {
+       nextOut = timeOut;
+       if (!printAsCSV)
+          printCollectedCallbackStat ("summmary for found ensemble", 1);
+    }
+
+    if (!scanOnly) {
+       audiodata ad;
+       packetdata pd;
+       run. store (true);
+       const std::string *pPlayProgName = &programName;
+       if (serviceIdentifier != -1) {
+          if (haveProgramNameForSID)
+             pPlayProgName = &programNameForSID;
+          else {
+             std::cerr <<
+                  "sorry  we could not find program for given SID "
+                          << std::hex << serviceIdentifier << "\n";
+                run.store(false);
+          }
+       }
+
+       std::cerr << "we try to start service '"
+                                      << *pPlayProgName << "'\n";
+       if (is_audioService (theRadio, pPlayProgName -> c_str ())) {
+          dataforAudioService (theRadio,
+                               pPlayProgName -> c_str(), &ad, 0);
+          if (!ad.defined) {
+             std::cerr <<
+               "sorry  we cannot handle service '" << *pPlayProgName
+                                                              << "'\n";
+             run.store(false);
+          }
+       } else
+       if (is_dataService (theRadio, pPlayProgName -> c_str())) {
+          dataforDataService (theRadio,
+                                 pPlayProgName -> c_str(), &pd, 0);
+          if (!pd.defined) {
+              std::cerr <<
+                   "sorry  we cannot handle service '" << *pPlayProgName
+                                                                << "'\n";
+             run.store(false);
+          }
+       } else {
+          std::cerr <<
+               "sorry, we cannot handle service '" << *pPlayProgName
+                                                                << "'\n";
+          run.store(false);
+       }
+
+       if (run. load ()) {
+          dabReset_msc (theRadio);
+          if (is_audioService (theRadio, pPlayProgName -> c_str ()))
+             set_audioChannel (theRadio, &ad);
+          else
+             set_dataChannel (theRadio, &pd);
+
+          int countGran = 0;
+          while (run. load ()) {
+             timeOutIncGranularity ();
+             sleepMillis (T_GRANULARITY);
+             printCollectedCallbackStat ("E: loading ..");
+// TODO: check for audio samples after some timeout!
+             if (countGran < 3000) {
+                countGran += T_GRANULARITY;
+                if ((countGran >= 3000) &&
+                    !gotSampleData && outWaveFilename) {
+                   std::cerr <<
+                    "abort after 3 sec without receiving sample data!\n";
+                   run.store(false);
+                }
+             }
+          }	// end of while
 
 #if LOG_EX_TII_SPECTRUM
-      if (useExTii) writeTiiExBuffer();
+          if (useExTii)
+                writeTiiExBuffer ();
 #endif
-    }
-    flush_fig_processings();
-  } else {  // scan only
-    uint64_t secsEpoch = msecs_progStart / 1000;
-    bool gotECC = false;
-    bool gotInterTabId = false;
-    const uint8_t eccCode = dab_getExtendedCountryCode(theRadio, &gotECC);
-    const uint8_t interTabId =
-        dab_getInternationalTabId(theRadio, &gotInterTabId);
-    const std::string comma = ",";
+          }
+          flush_fig_processings();
+       } else {  // scan only
+          uint64_t secsEpoch = msecs_progStart / 1000;
+          bool gotECC = false;
+          bool gotInterTabId = false;
+          const uint8_t eccCode =
+                  dab_getExtendedCountryCode (theRadio, &gotECC);
+          const uint8_t interTabId =
+                 dab_getInternationalTabId(theRadio, &gotInterTabId);
+          const std::string comma = ",";
 
 #if LOG_EX_TII_SPECTRUM
-    if (useExTii) writeTiiExBuffer();
+          if (useExTii)
+             writeTiiExBuffer();
 #endif
 
-    std::string ensembleCols;
-    std::string ensembleComm;
-    {
-      std::stringstream sidStrStream;
-      sidStrStream << std::hex << ensembleIdentifier;
-      ensembleCols = comma + "0x" + sidStrStream.str();
-      ensembleComm = comma + "SID";
-      if (ensembleRecognized.load()) {
-        ensembleCols += comma + prepCsvStr(ensembleName);
-      } else {
-        ensembleCols += comma + prepCsvStr("unknown ensemble");
-      }
-      ensembleComm = comma + "ensembleName";
-    }
+          std::string ensembleCols;
+          std::string ensembleComm;
+          {
+             std::stringstream sidStrStream;
+             sidStrStream << std::hex << ensembleIdentifier;
+             ensembleCols = comma + "0x" + sidStrStream.str();
+             ensembleComm = comma + "SID";
+             if (ensembleRecognized. load ()) {
+                ensembleCols += comma + prepCsvStr (ensembleName);
+             } else {
+                ensembleCols += comma + prepCsvStr ("unknown ensemble");
+             }
+             ensembleComm = comma + "ensembleName";
+          }
 
-    int mostTii = -1;
-    int numMostTii = 0;
-    for (auto const &x : tiiMap) {
-      if (x.second > numMostTii && x.first > 0) {
-        numMostTii = x.second;
-        mostTii = x.first;
-      }
-    }
+          int mostTii = -1;
+          int numMostTii = 0;
+          for (auto const &x : tiiMap) {
+             if (x.second > numMostTii && x.first > 0) {
+                numMostTii = x.second;
+                mostTii = x.first;
+             }
+          }
 
-    if (printAsCSV) {
-      std::string outLine = std::to_string(secsEpoch);
-      std::string outComm = std::to_string(secsEpoch);
-      outLine += comma + "CSV_ENSEMBLE";
-      outComm += comma + "#CSV_ENSEMBLE";
-      outLine += comma + prepCsvStr(theChannel);
-      outComm += comma + "channel";
-      outLine += ensembleCols;
-      outComm += ensembleComm;
+          if (printAsCSV) {
+             std::string outLine = std::to_string (secsEpoch);
+             std::string outComm = std::to_string (secsEpoch);
+             outLine += comma + "CSV_ENSEMBLE";
+             outComm += comma + "#CSV_ENSEMBLE";
+             outLine += comma + prepCsvStr (theChannel);
+             outComm += comma + "channel";
+             outLine += ensembleCols;
+             outComm += ensembleComm;
 
-      outLine += comma + prepCsvStr("snr");
-      outComm += comma + "snr";
-      outLine += comma + std::to_string(int(stat_minSnr));
-      outComm += comma + "min_snr";
-      outLine += comma + std::to_string(int(stat_maxSnr));
-      outComm += comma + "max_snr";
-      outLine += comma + std::to_string(int(numSnr));
-      outComm += comma + "num_snr";
-      outLine += comma + std::to_string(int(avgSnr));
-      outComm += comma + "avg_snr";
+             outLine += comma + prepCsvStr ("snr");
+             outComm += comma + "snr";
+             outLine += comma + std::to_string (int (stat_minSnr));
+             outComm += comma + "min_snr";
+             outLine += comma + std::to_string (int (stat_maxSnr));
+             outComm += comma + "max_snr";
+             outLine += comma + std::to_string (int (numSnr));
+             outComm += comma + "num_snr";
+             outLine += comma + std::to_string (int (avgSnr));
+             outComm += comma + "avg_snr";
 
-      outLine += comma + prepCsvStr("fic");
-      outComm += comma + "fic";
-      outLine += comma + std::to_string(int(stat_minFic));
-      outComm += comma + "min_fic";
-      outLine += comma + std::to_string(int(stat_maxFic));
-      outComm += comma + "max_fic";
-      outLine += comma + std::to_string(int(numFic));
-      outComm += comma + "num_fic";
-      outLine += comma + std::to_string(int(avgFic));
-      outComm += comma + "avg_fic";
+             outLine += comma + prepCsvStr ("fic");
+             outComm += comma + "fic";
+             outLine += comma + std::to_string (int (stat_minFic));
+             outComm += comma + "min_fic";
+             outLine += comma + std::to_string (int (stat_maxFic));
+             outComm += comma + "max_fic";
+             outLine += comma + std::to_string (int (numFic));
+             outComm += comma + "num_fic";
+             outLine += comma + std::to_string (int (avgFic));
+             outComm += comma + "avg_fic";
 
-      outLine += comma + prepCsvStr("tii");
-      outComm += comma + "tii";
-      if (useExTii) {
-        std::vector<ExTiiInfo> tiiExVec;
-        tiiExVec.reserve(tiiExMap.size());
-        for (auto const &x : tiiExMap) {
-          tiiExVec.push_back(x.second);
-        }
-        std::sort(tiiExVec.begin(), tiiExVec.end());
-        for (auto const &x : tiiExVec) {
-          outLine += comma + std::to_string(x.tii);
-          outComm += comma + "tii_id";
-          outLine += comma + std::to_string(x.numOccurences);
-          outComm += comma + "num";
-          outLine +=
-              comma + std::to_string(int((x.maxAvgSNR < 0.0F ? -0.5F : 0.5F) +
+             outLine += comma + prepCsvStr ("tii");
+             outComm += comma + "tii";
+             if (useExTii) {
+                std::vector<ExTiiInfo> tiiExVec;
+                tiiExVec.reserve (tiiExMap. size ());
+                for (auto const &x : tiiExMap) {
+                   tiiExVec. push_back (x.second);
+                }
+
+                std::sort (tiiExVec. begin (), tiiExVec. end ());
+                for (auto const &x : tiiExVec) {
+                   outLine += comma + std::to_string (x. tii);
+                   outComm += comma + "tii_id";
+                   outLine += comma + std::to_string (x. numOccurences);
+                   outComm += comma + "num";
+                   outLine += comma +
+                     std::to_string (int ((x.maxAvgSNR < 0.0F ? -0.5F : 0.5F) +
                                          10.0F * x.maxAvgSNR));
-          outComm += comma + "max(avg_snr)";
-          outLine +=
-              comma + std::to_string(int((x.maxMinSNR < 0.0F ? -0.5F : 0.5F) +
+                   outComm += comma + "max (avg_snr)";
+                   outLine += comma +
+                     std::to_string (int ((x.maxMinSNR < 0.0F ? -0.5F : 0.5F) +
                                          10.0F * x.maxMinSNR));
-          outComm += comma + "max(min_snr)";
-          outLine +=
-              comma + std::to_string(int((x.maxNxtSNR < 0.0F ? -0.5F : 0.5F) +
+                   outComm += comma + "max (min_snr)";
+                   outLine += comma +
+                     std::to_string (int ((x.maxNxtSNR < 0.0F ? -0.5F : 0.5F) +
                                          10.0F * x.maxNxtSNR));
-          outComm += comma + "max(next_snr)";
-          outLine += comma;
-          outComm += comma;
-        }
-      } else {
-        outLine += comma + std::to_string(int(numMostTii));
-        outComm += comma + "tii_id";
-        outLine += comma + std::to_string(int(numAllTii));
-        outComm += comma + "num_all";
-        outLine += comma + std::to_string(int(mostTii));
-        outComm += comma + "num_id";
-      }
+                   outLine += comma + comma;
+                   outComm += comma + comma + "max (next_snr)";
+                }
+             } else {
+                outLine += comma + std::to_string (int (numMostTii));
+                outComm += comma + "tii_id";
+                outLine += comma + std::to_string (int (numAllTii));
+                outComm += comma + "num_all";
+                outLine += comma + std::to_string(int(mostTii));
+                outComm += comma + "num_id";
+             }
       
-      if (ensembleRecognized.load()) {
-        outLine += comma + comma + prepCsvStr("shortLabel") + comma + prepCsvStr(ensembleAbbr);
-      } else {
-        outLine += comma + comma + prepCsvStr("shortLabel") + comma + prepCsvStr("unknown");
-      }
-      outComm += comma + comma + "shortLabel" + comma + "label";
+             if (ensembleRecognized. load ()) {
+                outLine += comma + comma +
+                        prepCsvStr ("shortLabel") + comma +
+                                   prepCsvStr (ensembleAbbr);
+             } else {
+                outLine += comma + comma +
+                        prepCsvStr ("shortLabel") + comma +
+                                   prepCsvStr ("unknown");
+             }
+             outComm += comma + comma + "shortLabel" + comma + "label";
 
-      fprintf(infoStrm, "%s\n", outComm.c_str());
-      fprintf(infoStrm, "%s\n", outLine.c_str());
-    }
-
-    int16_t mainId, subId, TD;
-    float gps_latitude, gps_longitude;
-    bool gps_success = false;
-    dab_getCoordinates(theRadio, -1, -1, &gps_latitude, &gps_longitude,
-                       &gps_success, &mainId, &subId);
-    if (gps_success) {
-      for (subId = 1; subId <= 23; ++subId) {
-        dab_getCoordinates(theRadio, mainId, subId, &gps_latitude,
-                           &gps_longitude, &gps_success, nullptr, nullptr, &TD);
-        if (gps_success) {
-          if (!printAsCSV) {
-            fprintf(infoStrm,
-                    "\ttransmitter gps coordinate (latitude / longitude) "
-                    "for\ttii %04d\t=%f / %f\tTD=%d us\n",
-                    mainId * 100 + subId, gps_latitude, gps_longitude, int(TD));
-          } else {
-            std::string outLine = std::to_string(secsEpoch);
-            outLine += comma + "CSV_GPSCOOR";
-            outLine += comma + prepCsvStr(theChannel);
-            outLine += ensembleCols;
-
-            outLine += comma + std::to_string(mainId * 100 + subId);
-            outLine += comma + std::to_string(gps_latitude);
-            outLine += comma + std::to_string(gps_longitude);
-            outLine += comma + std::to_string(int(TD));
-            fprintf(infoStrm, "%s\n", outLine.c_str());
+             fprintf (infoStrm, "%s\n", outComm.c_str ());
+             fprintf (infoStrm, "%s\n", outLine.c_str ());
           }
-        }
-      }  // end for
+
+          int16_t mainId, subId, TD;
+          float gps_latitude, gps_longitude;
+          bool gps_success = false;
+          dab_getCoordinates (theRadio, -1, -1,
+                        &gps_latitude, &gps_longitude,
+                            &gps_success, &mainId, &subId);
+    if (gps_success) {
+       for (subId = 1; subId <= 23; ++subId) {
+          dab_getCoordinates (theRadio, mainId, subId,
+                              &gps_latitude, &gps_longitude,
+                              &gps_success, nullptr, nullptr, &TD);
+          if (gps_success) {
+             if (!printAsCSV) {
+                fprintf (infoStrm,
+                         "\ttransmitter gps coordinate (latitude / longitude) "
+                         "for\ttii %04d\t=%f / %f\tTD=%d us\n",
+                         mainId * 100 + subId,
+                     gps_latitude, gps_longitude, int (TD));
+             } else {
+                std::string outLine = std::to_string (secsEpoch);
+                outLine += comma + "CSV_GPSCOOR";
+                outLine += comma + prepCsvStr (theChannel);
+                outLine += ensembleCols;
+
+                outLine += comma + std::to_string (mainId * 100 + subId);
+                outLine += comma + std::to_string (gps_latitude);
+                outLine += comma + std::to_string (gps_longitude);
+                outLine += comma + std::to_string(int(TD));
+                fprintf(infoStrm, "%s\n", outLine.c_str());
+             }
+          }
+       }  // end for
     }    // end if (gps_success)
 
-    std::string outAudioBeg = std::to_string(secsEpoch);
+    std::string outAudioBeg = std::to_string (secsEpoch);
     outAudioBeg += comma + "CSV_AUDIO";
     outAudioBeg += comma + prepCsvStr(theChannel);
     outAudioBeg += ensembleCols;
 
     std::string outPacketBeg = std::to_string(secsEpoch);
-    outPacketBeg += comma + "CSV_PACKET";
-    outPacketBeg += comma + prepCsvStr(theChannel);
-    outPacketBeg += ensembleCols;
+    outPacketBeg		+= comma + "CSV_PACKET";
+    outPacketBeg		+= comma + prepCsvStr(theChannel);
+    outPacketBeg		+= ensembleCols;
 
 #if PRINT_DBG_ALL_SERVICES
-        fprintf(stderr, "\n\n");
+    fprintf(stderr, "\n\n");
 #endif
 
     for (auto &it : globals.channels) {
-      serviceIdentifier = it.first;
-      int numAudioInSvc = 0;
-      int numPacketInSvc = 0;
-      char typeOfSvc = '?';
-#if PRINT_DBG_ALL_SERVICES
-      //fprintf (stderr, "going to check %s\n", it.second->programName.c_str());
-#endif
-      if (is_audioService_by_id(theRadio, serviceIdentifier))
-        typeOfSvc = 'A';
-      else if ( is_dataService_by_id(theRadio, serviceIdentifier) )
-        typeOfSvc = 'P';
+       serviceIdentifier = it.first;
+       int numAudioInSvc = 0;
+       int numPacketInSvc = 0;
+       char typeOfSvc = '?';
+       if (is_audioService_by_id (theRadio, serviceIdentifier))
+          typeOfSvc = 'A';
+       else
+       if (is_dataService_by_id (theRadio, serviceIdentifier))
+          typeOfSvc = 'P';
 
-      if ( typeOfSvc != '?' ) {
-        if (!printAsCSV) {
-          fprintf(infoStrm,
-                  "\n" FMT_DURATION
-                  "checked program '%s' with SId %X\n" SINCE_START,
-                  it.second->programName.c_str(), serviceIdentifier);
-        }
-        // numberofComponents = getBits_4() in fib-decoder.cpp => 0 .. 15
-        for (int i = 0; i < 16; i++) {
+       if (typeOfSvc != '?') {
+          if (!printAsCSV) {
+             fprintf (infoStrm,
+                      "\n" FMT_DURATION
+                       "checked program '%s' with SId %X\n" SINCE_START,
+                                   it. second -> programName.c_str (),
+                                                      serviceIdentifier);
+       }
+//	numberofComponents = getBits_4() in fib-decoder.cpp => 0 .. 15
+       for (int i = 0; i < 16; i++) {
           audiodata ad;
           packetdata pd;
-          dataforAudioService_by_id(theRadio, serviceIdentifier, &ad, i);
+          dataforAudioService_by_id (theRadio, serviceIdentifier, &ad, i);
 
           if (ad.defined) {
-            ++numAudioInSvc;
-            uint8_t countryId = (serviceIdentifier >> 12) & 0xF;  // audio
-            assert( i == ad.componentNr );
-            if (!printAsCSV) {
-              fprintf(infoStrm, "\taudioData:\n");
-              fprintf(infoStrm, "\t\tsubchId\t\t= %d\n", int(ad.subchId));
-              fprintf(infoStrm, "\t\tstartAddr\t= %d\n", int(ad.startAddr));
-              fprintf(infoStrm, "\t\tshortForm\t= %s\n",
-                      ad.shortForm ? "true" : "false");
-              fprintf(infoStrm, "\t\tprotLevel\t= %d: '%s'\n",
-                      int(ad.protLevel),
-                      getProtectionLevel(ad.shortForm, ad.protLevel));
-              fprintf(infoStrm, "\t\tcodeRate\t= %d: '%s'\n", int(ad.protLevel),
-                      getCodeRate(ad.shortForm, ad.protLevel));
-              fprintf(infoStrm, "\t\tlength\t\t= %d\n", int(ad.length));
-              fprintf(infoStrm, "\t\tbitRate\t\t= %d\n", int(ad.bitRate));
-              fprintf(infoStrm, "\t\tASCTy\t\t= %d: '%s'\n", int(ad.ASCTy),
-                      getASCTy(ad.ASCTy));
-              if (gotECC)
-                fprintf(infoStrm, "\t\tcountry\tECC %X, Id %X: '%s'\n",
-                        int(eccCode), int(countryId),
-                        getCountry(eccCode, countryId));
-              fprintf(infoStrm, "\t\tlanguage\t= %d: '%s'\n", int(ad.language),
-                      getLanguage(ad.language));
-              fprintf(
-                  infoStrm, "\t\tprogramType\t= %d: '%s'\n",
-                  int(ad.programType),
-                  getProgramType(gotInterTabId, interTabId, ad.programType));
+             ++numAudioInSvc;
+             uint8_t countryId = (serviceIdentifier >> 12) & 0xF;  // audio
+             assert (i == ad.componentNr);
+             if (!printAsCSV) {
+                fprintf (infoStrm, "\taudioData:\n");
+                fprintf (infoStrm, "\t\tsubchId\t\t= %d\n",
+                                   int (ad.subchId));
+                fprintf (infoStrm, "\t\tstartAddr\t= %d\n",
+                                   int (ad.startAddr));
+                fprintf (infoStrm, "\t\tshortForm\t= %s\n",
+                                  ad.shortForm ? "true" : "false");
+                fprintf (infoStrm, "\t\tprotLevel\t= %d: '%s'\n",
+                                  int (ad.protLevel),
+                                  getProtectionLevel (ad.shortForm,
+                                                      ad.protLevel));
+                fprintf (infoStrm, "\t\tcodeRate\t= %d: '%s'\n",
+                                  int (ad.protLevel),
+                                      getCodeRate (ad.shortForm,
+                                           ad.protLevel));
+                fprintf (infoStrm, "\t\tlength\t\t= %d\n",
+                                  int (ad.length));
+                fprintf (infoStrm, "\t\tbitRate\t\t= %d\n",
+                                  int(ad.bitRate));
+                fprintf (infoStrm, "\t\tASCTy\t\t= %d: '%s'\n",
+                                  int(ad.ASCTy), getASCTy(ad.ASCTy));
+                std::string getDetailedAudioInfo(int ASCTy, int bitRate);
+                                  
+                fprintf (infoStrm, "\t\tAudio Codec\t= %s\n",
+                  getDetailedAudioInfo(ad.ASCTy, ad.bitRate).c_str());
+                
+                if (ad.ecc != 0) {
+                    fprintf(infoStrm, "\t\tcountry\tECC %X, Id %X: '%s'\n",
+                            static_cast<int>(ad.ecc), static_cast<int>(countryId),
+                            getCountry(ad.ecc, countryId));
+                } else {
+                    std::string countryName = getCountry(eccCode, (ensembleIdentifier >> 12 ) & 0xF);
+                    std::string servCountry = getCountry(eccCode, countryId);
+                    if (gotInterTabId) {
+                        fprintf(infoStrm, "\t\tcountry\tECC %X, Id %X: '%s'\n",
+                                eccCode, countryId, countryName.c_str());
+                    } else if (!servCountry.empty()) {
+                        fprintf(infoStrm, "\t\tcountry\tECC %X, Id %X: '%s'\n",
+                                eccCode, countryId, servCountry.c_str());
+                    }
+                }
+                fprintf (infoStrm, "\t\tlanguage\t= %d: '%s'\n",
+                                  int(ad.language),
+                                  getLanguage (ad.language));
+                fprintf (infoStrm, "\t\tprogramType\t= %d: '%s'\n",
+                                  int (ad.programType),
+                                  getProgramType (gotInterTabId,
+                                                  interTabId,
+                                                  ad.programType));
 
-            } else {
-              std::string outLine = outAudioBeg;
-              std::stringstream sidStrStream;
-              sidStrStream << std::hex << serviceIdentifier;
-              outLine += comma + "0x" + sidStrStream.str();
-              outLine += comma + prepCsvStr(it.second->programName.c_str());
+             } else {
+                 std::string outLine = outAudioBeg;
+                std::stringstream sidStrStream;
+                sidStrStream << std::hex << serviceIdentifier;
+                outLine += comma + "0x" + sidStrStream.str();
+                outLine += comma +
+                      prepCsvStr (it. second -> programName.c_str ());
               outLine += comma + std::to_string(int(ad.componentNr));
               outLine += comma + std::to_string(countryId);
               outLine += comma + prepCsvStr(getProtectionLevel(ad.shortForm,
@@ -1661,24 +1713,40 @@ int main(int argc, char **argv) {
               outLine += comma + std::to_string(int(ad.bitRate));
               outLine += comma + std::to_string(int(ad.ASCTy));
               outLine += comma + prepCsvStr(getASCTy(ad.ASCTy));
-              if (gotECC) {
-                std::stringstream eccStrStream;
-                std::stringstream countryStrStream;
-                eccStrStream << std::hex << int(eccCode);
-                countryStrStream << std::hex << int(countryId);
-                outLine += comma + "0x" + eccStrStream.str();
-                outLine += comma + "0x" + countryStrStream.str();
-                const char *countryStr = getCountry(eccCode, countryId);
-                outLine += comma + (countryStr ? prepCsvStr(countryStr)
-                                               : prepCsvStr("unknown country"));
+              
+              if (ad.ecc != 0) {
+                  std::stringstream eccStrStream;
+                  std::stringstream countryStrStream;
+                  eccStrStream << "0x" << std::hex << int(ad.ecc);
+                  countryStrStream << "0x" << std::hex << int(countryId);
+                  outLine += comma + eccStrStream.str();
+                  outLine += comma + countryStrStream.str();
+                  const char *countryStr = getCountry(ad.ecc, countryId);
+                  outLine += comma + (countryStr ? prepCsvStr(countryStr) : prepCsvStr("unknown country"));
               } else {
-                outLine += comma + comma + comma;
+                  std::stringstream eccStrStream;
+                  std::stringstream countryStrStream;
+                  eccStrStream << "0x" << std::hex << int(eccCode);
+                  countryStrStream << "0x" << std::hex << int(countryId);
+                  outLine += comma + eccStrStream.str();
+                  outLine += comma + countryStrStream.str();
+                  if (gotInterTabId) {
+                      std::string countryName = getCountry(eccCode, (ensembleIdentifier >> 12) & 0xF);
+                      outLine += comma + (countryName.empty() ? prepCsvStr("unknown country") : prepCsvStr(countryName.c_str()));
+                  } else {
+                      std::string servCountry = getCountry(eccCode, countryId);
+                      outLine += comma + (servCountry.empty() ? prepCsvStr("unknown country") : prepCsvStr(servCountry.c_str()));
+                  }
               }
               outLine += comma + std::to_string(int(ad.language));
-              outLine += comma + prepCsvStr(getLanguage(ad.language));
+              {
+                  const char *langName = getLanguage(ad.language);
+                  outLine += comma + prepCsvStr(
+                      (langName != nullptr && langName[0] != '\0') ? langName : "unknown"
+                  );
+              }
               outLine += comma + std::to_string(int(ad.programType));
-              outLine +=
-                  comma + prepCsvStr(getProgramType(gotInterTabId, interTabId,
+              outLine += comma + prepCsvStr(getProgramType(gotInterTabId, interTabId,
                                                     ad.programType));
               outLine += comma + std::to_string(int(ad.length));
               outLine += comma + std::to_string(int(ad.subchId));
@@ -1717,7 +1785,7 @@ int main(int argc, char **argv) {
                 fprintf(infoStrm, "\t\tbitRate\t\t= %d\n", int(pd.bitRate));
                 fprintf(infoStrm, "\t\tFEC_scheme\t= %d: '%s'\n",
                         int(pd.FEC_scheme), getFECscheme(pd.FEC_scheme));
-                fprintf(infoStrm, "\t\tDGflag\t= %d\n", int(pd.DGflag));
+                fprintf(infoStrm, "\t\tDGflag\t\t= %d\n", int(pd.DGflag));
                 fprintf(infoStrm, "\t\tpacketAddress\t= %d\n",
                         int(pd.packetAddress));
                 if (gotECC)
@@ -1802,11 +1870,11 @@ int main(int argc, char **argv) {
   fprintf(stderr, "\n" FMT_DURATION "at dabStop()\n" SINCE_START);
 #endif
 
-  if (audioSink != stdout) {
-    waveFinalizeHeader(audioSink);
-    fclose(audioSink);
-    audioSink = stdout;
-  }
+    if (audioSink != stdout) {
+       waveFinalizeHeader (audioSink);
+       fclose (audioSink);
+       audioSink = stdout;
+    }
 
   FAST_EXIT(123);
   dabStop(theRadio);
@@ -1830,26 +1898,26 @@ void printOptions(void) {
   fprintf(
       stderr,
       "	dab-cmdline options are\n\
-	-W number   amount of time to look for a time sync in %s\n\
-	-A number   amount of time to look for an ensemble in %s\n\
-	-E minSNR   activates scan mode: if set, quit after loading scan data\n\
-	            also quit, if SNR is below minSNR\n\
-	-t number   determine tii every number frames. default is 10\n\
-	-a alfa     update tii spectral power with factor alfa in 0 to 1. default: 0.9\n\
-	-r number   reset tii spectral power every number frames. default: 10\n\
-	            tii statistics is output in scan mode\n\
-	-x          switch tii algorithm to extended one\n\
-	-c          activates CSV output mode\n\
-	-M Mode     Mode is 1, 2 or 4. Default is Mode 1\n\
-	-B Band     Band is either L_BAND or BAND_III (default)\n\
-	-P name     program to be selected in the ensemble\n\
-	-p ppmCorr  ppm correction\n\
-	-T tol      tolerate mismatch of up to tol ms from system time before recording is aborted\n\
-	              default = -1. negative values deactivate abortion\n"
+    -W number   amount of time to look for a time sync in %s\n\
+    -A number   amount of time to look for an ensemble in %s\n\
+    -E minSNR   activates scan mode: if set, quit after loading scan data\n\
+                also quit, if SNR is below minSNR\n\
+    -t number   determine tii every number frames. default is 10\n\
+    -a alfa     update tii spectral power with factor alfa in 0 to 1. default: 0.9\n\
+    -r number   reset tii spectral power every number frames. default: 10\n\
+                tii statistics is output in scan mode\n\
+    -x          switch tii algorithm to extended one\n\
+    -c          activates CSV output mode\n\
+    -M Mode     Mode is 1, 2 or 4. Default is Mode 1\n\
+    -B Band     Band is either L_BAND or BAND_III (default)\n\
+    -P name     program to be selected in the ensemble\n\
+    -p ppmCorr  ppm correction\n\
+    -T tol      tolerate mismatch of up to tol ms from system time before recording is aborted\n\
+                  default = -1. negative values deactivate abortion\n"
       "%s"
 #if defined(HAVE_RTLSDR)
       "	-d index    set RTLSDR device index\n\
-	-s serial   set RTLSDR device serial\n"
+    -s serial   set RTLSDR device serial\n"
 #endif
 #if defined(HAVE_WAVFILES) || defined(HAVE_RAWFILES)
       "	-F filename in case the input is from file\n"
@@ -1858,18 +1926,18 @@ void printOptions(void) {
 
 #else
       "	-C channel  channel to be used\n\
-	-G Gain     gain for device (range 1 .. 100)\n\
-	-Q          if set, set autogain for device true\n"
+    -G Gain     gain for device (range 1 .. 100)\n\
+    -Q          if set, set autogain for device true\n"
 #ifdef HAVE_RTL_TCP
       "	-H hostname  hostname for rtl_tcp\n\
-	-I port      port number to rtl_tcp\n"
+    -I port      port number to rtl_tcp\n"
 #endif
 #endif
-      "	-S hexnumber use hexnumber to identify program\n"
-      "	-w fileName  write audio to wave file\n"
-      "	-f           write binary FIC data to ficdata.fic\n"
-      "	-n runtime   stream/save runtime seconds of audio, then exit\n"
-      "	-z freq_off  initial 'coarse' frequency offset\n"
-      "	-v           increase verbosity\n\n",
+      "	-S hexnumber use hexnumber to identify program\n\
+    -w fileName  write audio to wave file\n\
+    -f           write binary FIC data to ficdata.fic\n\
+    -n runtime   stream/save runtime seconds of audio, then exit\n\
+    -z freq_off  initial 'coarse' frequency offset\n\
+    -v           increase verbosity\n\n",
       T_UNITS, T_UNITS, devOptHelp);
 }

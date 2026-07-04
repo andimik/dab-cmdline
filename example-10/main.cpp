@@ -1659,7 +1659,9 @@ int	main (int argc, char **argv) {
 
 	      if (ad.defined) {
 	         ++numAudioInSvc;
-	         uint8_t countryId = (serviceIdentifier >> 12) & 0xF;  // audio
+	         uint8_t countryId = ad.countryId;
+	         if (countryId == 0)
+	            countryId = (serviceIdentifier >> 12) & 0xF;
 	         assert (i == ad.componentNr);
 	         if (!printAsCSV) {
 	            fprintf (infoStrm, "\taudioData:\n");
@@ -1683,13 +1685,13 @@ int	main (int argc, char **argv) {
 	                              int(ad.bitRate));
 	            fprintf (infoStrm, "\t\tASCTy\t\t= %d: '%s'\n",
 	                              int(ad.ASCTy), getASCTy(ad.ASCTy));
-                
-                // code proposed by AI
-                
+                                
                 if (ad.ecc != 0) {
+					uint8_t effectiveEcc = (ad.ecc !=0) ? ad.ecc : eccCode;
                     fprintf(infoStrm, "\t\tcountry\tECC %X, Id %X: '%s'\n",
-                            static_cast<int>(ad.ecc), static_cast<int>(countryId),
-                            getCountry(ad.ecc, countryId));
+                            // static_cast<int>(ad.ecc), static_cast<int>(countryId),
+                            int(effectiveEcc), int(countryId), 
+							getCountry(effectiveEcc, countryId));
                 } else {
                     std::string countryName = getCountry(eccCode, (ensembleIdentifier >> 12 ) & 0xF);
                     std::string servCountry = getCountry(eccCode, countryId);
@@ -1781,7 +1783,9 @@ int	main (int argc, char **argv) {
 
             if (pd.defined) {
               ++numPacketInSvc;
-              uint8_t countryId = (serviceIdentifier >> (5 * 4)) & 0xF;
+              uint8_t countryId = pd.countryId;
+              if (countryId == 0)
+                countryId = (serviceIdentifier >> (5 * 4)) & 0xF;
               assert( i == pd.componentNr );
               if (!printAsCSV) {
                 fprintf(infoStrm, "\tpacket:\n");
@@ -1831,16 +1835,15 @@ int	main (int argc, char **argv) {
                 outLine += comma + prepCsvStr(getFECscheme(pd.FEC_scheme));
                 outLine += comma + std::to_string(int(pd.DGflag));
                 if (gotECC) {
-                  std::stringstream eccStrStream;
-                  std::stringstream countryStrStream;
-                  eccStrStream << std::hex << int(eccCode);
-                  countryStrStream << std::hex << int(countryId);
-                  outLine += comma + "0x" + eccStrStream.str();
-                  outLine += comma + "0x" + countryStrStream.str();
-                  const char *countryStr = getCountry(eccCode, countryId);
-                  outLine +=
-                      comma + (countryStr ? prepCsvStr(countryStr)
-                                          : prepCsvStr("unknown country"));
+					uint8_t effectiveEcc = (ad.ecc != 0) ? ad.ecc : eccCode;
+					std::stringstream eccStrStream;
+					std::stringstream countryStrStream;
+					eccStrStream << "0x" << std::hex << int(effectiveEcc);
+					countryStrStream << "0x" << std::hex << int(countryId);
+					outLine += comma + eccStrStream.str();
+					outLine += comma + countryStrStream.str();
+					const char *countryStr = getCountry(effectiveEcc, countryId);
+					outLine += comma + prepCsvStr(countryStr ? countryStr : "unknown country");
                 } else {
                   outLine += comma + comma + comma;
                 }

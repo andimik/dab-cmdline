@@ -1,4 +1,4 @@
-# DAB-cmdline for use with FMLIST Scanner 
+# dab-cmdline for use with FMLIST Scanner 
 
 This is a fork of https://github.com/JvanKatwijk/dab-cmdline/ especially for use with https://github.com/hayguen/fmlist_scan 
 
@@ -55,13 +55,13 @@ Also detailled information, which will later be used on FMLIST (section URDS).
 		length		= 36
 		bitRate		= 48
 		ASCTy		= 63: 'DAB+'
-		country	ECC E0, Id 4: 'Israel'
-		language	= -1: 'unknown (Lang.)'
+		country	ECC E2, Id 4: 'Vatican'
+		language	= 21: 'Italian'
 		programType	= 20: 'Religion'
 LIST: SID 0000410E of type A has 1 audio and 0 packet components: 'Radio Vaticana  ' / 'Vaticana'
 ```
 
-and a summary in csv format for the automatic upload of the FMLIST Scanner.
+and a summary in `csv` format for the automatic upload of the FMLIST Scanner.
 
 ```
 all meta info of fib_processor:
@@ -130,27 +130,23 @@ subChannels:
 25(20): subChID   25, startAddr 684, len  48, sz  48, long, idxOrCase 101, tabIdx -1, protLevel 1, bitRate  48, lang -1, FEC -1
 ```
 
-Note: it's still work in progress regarding improvements.
-
 ## Todo-List:
+
+### ideas
+
+- [ ] add audio details
 
 ### fixed bugs
 
 - [x] ECC and Country code (thanks to Jan van Katwijk for the bugfix)
+- [x] ECC even works when the service ECC is different from the ensemble
 
-### open bugs
 
-- [ ] language value is `-1`.
-
--------------------------------------------------------------------------
-Copyrights
--------------------------------------------------------------------------
+# Copyrights
 	
-	Copyright (C)  2016, 2017
-	Jan van Katwijk (J.vanKatwijk@gmail.com)
-	Lazy Chair Programming
+Copyright (C)  2016, 2017, 2026
+Jan van Katwijk (J.vanKatwijk@gmail.com)
+Lazy Chair Programming
 
-The dab-library software is made available under the GPL-2.0. The dab-library uses a number of GPL-ed libraries, all
-rigfhts gratefully acknowledged.
-All SDR-J software, among which dab-library is one - is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 	GNU General Public License for more details.
+The dab-library software is made available under the GPL-2.0. The dab-library uses a number of GPL-ed libraries, all rights gratefully acknowledged. All SDR-J software, among which dab-library is one - is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 

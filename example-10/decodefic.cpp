@@ -92,7 +92,7 @@ static void sighandler(int signum) {
   run.store(false);
 }
 
-void	device_eof_callback(void *userData) {
+void device_eof_callback(void *userData) {
   (void)userData;
   fprintf(stderr, "\nEnd-of-File reached, triggering termination!\n");
   flush_fig_processings();

@@ -92,7 +92,7 @@ static void sighandler(int signum) {
   run.store(false);
 }
 
-void device_eof_callback(void *userData) {
+void	device_eof_callback(void *userData) {
   (void)userData;
   fprintf(stderr, "\nEnd-of-File reached, triggering termination!\n");
   flush_fig_processings();
@@ -127,7 +127,7 @@ static void fib_dataHandler(const uint8_t *fib) {
   }
 }
 
-int main(int argc, char **argv) {
+int main (int argc, char **argv) {
   const char *inpFileName = NULL;
   FILE *ficf = NULL;
   struct sigaction sigact;

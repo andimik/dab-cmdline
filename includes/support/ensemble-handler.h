@@ -28,32 +28,31 @@
 #ifndef __ENSEMBLE_HANDLER__
 #define __ENSEMBLE_HANDLER__
 
-#include	<stdint.h>
-#include	<stdio.h>
-#include	<list>
-#include	<mutex>
-#include	<string>
-#include	<vector>
+#include <stdint.h>
+#include <stdio.h>
+#include <list>
+#include <mutex>
+#include <string>
 
 class ensembleHandler {
-public:
-		ensembleHandler		();
-		~ensembleHandler	();
-	void	addtoEnsemble		(const std::string &, int32_t);
-	void	nameforEnsemble		(int id, const std::string &s);
-std::string	nameofEnsemble		();
-	bool	ensembleExists		();
-std::string	findService		(const std::string &);
-std::string	findService		(int32_t);
-std::string	getProgram		(int16_t);
-	void	clearEnsemble		();
-std::list<std::string> data		();
-	int	size			();
+ public:
+  ensembleHandler(void);
+  ~ensembleHandler(void);
+  void addtoEnsemble(const std::string &, int32_t);
+  void nameforEnsemble(int id, const std::string &s);
+  std::string nameofEnsemble(void);
+  bool ensembleExists(void);
+  std::string findService(const std::string &);
+  std::string findService(int32_t);
+  std::string getProgram(int16_t);
+  void clearEnsemble(void);
+  std::list<std::string> data(void);
+  int size(void);
 
  private:
-	std::list<std::string> stationList;
-	std::string ensembleName;
-	bool ensembleFound = false;
-	std::mutex locker;
+  std::list<std::string> stationList;
+  std::string ensembleName;
+  bool ensembleFound = false;
+  std::mutex locker;
 };
 #endif

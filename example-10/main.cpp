@@ -127,6 +127,7 @@ struct MyServiceData {
 	psFlag = -1;
 	mp2Mode = -1;
 	mp2Lsf = -1;
+	samplingRate = 0;
 	}
 
 	int SId;
@@ -154,6 +155,7 @@ struct MyServiceData {
 	int16_t psFlag;
 	int16_t mp2Mode;
 	int16_t mp2Lsf;
+	int32_t samplingRate;
 };
 
 struct MyGlobals {
@@ -839,7 +841,8 @@ static void mscQuality(int16_t fe, int16_t rsE, int16_t aacE, void *ctx) {
 
 static void audioCodecHandler(int16_t ASCTy, int16_t aacChannelMode,
 															int16_t sbrFlag, int16_t psFlag,
-															int16_t mp2Mode, int16_t mp2Lsf, void *ctx) {
+															int16_t mp2Mode, int16_t mp2Lsf,
+															int32_t samplingRate, void *ctx) {
 	(void)ctx;
 	auto serviceIt = globals.channels.find(serviceIdentifier);
 	if (serviceIt == globals.channels.end() || !serviceIt->second) return;
@@ -852,6 +855,7 @@ static void audioCodecHandler(int16_t ASCTy, int16_t aacChannelMode,
 	svc->psFlag = psFlag;
 	svc->mp2Mode = mp2Mode;
 	svc->mp2Lsf = mp2Lsf;
+	svc->samplingRate = samplingRate;
 }
 
 static const char *codecFromRealAnalysis(const MyServiceData &svc,
@@ -909,6 +913,7 @@ static void probeAudioServiceCodec(void *radio, int32_t sid, audiodata &ad,
 	svc->psFlag = -1;
 	svc->mp2Mode = -1;
 	svc->mp2Lsf = -1;
+	svc->samplingRate = 0;
 
 	serviceIdentifier = sid;
 	dabReset_msc(radio);
@@ -1800,7 +1805,9 @@ int	main (int argc, char **argv) {
 	         probeAudioServiceCodec(theRadio, serviceIdentifier, ad, 2200);
 	         MyServiceData *svc = it.second;
 	         const char *codecDescription = "unknown audio codec";
+	         int32_t codecSamplingRate = 0;
 	         if (svc) {
+	            codecSamplingRate = svc->samplingRate;
 	            if (svc->codecSeen) {
 	               codecDescription = codecFromRealAnalysis(*svc, ad.ASCTy);
 	            } else if (svc->qualityUpdates <= 0) {
@@ -1819,6 +1826,15 @@ int	main (int argc, char **argv) {
 	                                         ? "DAB+/no audio"
 	                                         : "DAB/no audio";
 	            }
+	         }
+
+	         std::string codecWithRate(codecDescription);
+	         if ((codecSamplingRate > 0) &&
+	             ((codecWithRate.find("Stereo") != std::string::npos) ||
+	              (codecWithRate.find("Mono") != std::string::npos))) {
+	            codecWithRate += " ";
+	            codecWithRate += std::to_string(int(codecSamplingRate / 1000));
+	            codecWithRate += "kHz";
 	         }
 
 	         if (!printAsCSV) {
@@ -1843,7 +1859,8 @@ int	main (int argc, char **argv) {
 	                              int(ad.bitRate));
 	            fprintf (infoStrm, "\t\tASCTy\t\t= %d: '%s'\n",
 	                              int(ad.ASCTy), getASCTy(ad.ASCTy));
-	            fprintf (infoStrm, "\t\taudioCodec\t= '%s'\n", codecDescription);
+	            fprintf (infoStrm, "\t\taudioCodec\t= '%s'\n",
+	                              codecWithRate.c_str());
                                 
 				uint8_t effectiveEcc = (ad.ecc != 0) ? ad.ecc : eccCode;
 				fprintf(infoStrm, "\t\tcountry\tECC %X, Id %X: '%s'\n",
@@ -1875,7 +1892,7 @@ int	main (int argc, char **argv) {
               outLine += comma + std::to_string(int(ad.bitRate));
               outLine += comma + std::to_string(int(ad.ASCTy));
               outLine += comma + prepCsvStr(getASCTy(ad.ASCTy));
-							outLine += comma + prepCsvStr(codecDescription);
+							outLine += comma + prepCsvStr(codecWithRate.c_str());
               
               // proposed by AI
               

@@ -134,12 +134,13 @@ subChannels:
 
 ### ideas
 
-- [ ] add audio details
+- [x] add audio details (real decoder-based codec detection)
 
 ### fixed bugs
 
 - [x] ECC and Country code (thanks to Jan van Katwijk for the bugfix)
 - [x] ECC even works when the service ECC is different from the ensemble
+- [x] codec output uses decoded stream metadata (AAC flags / MP2 mode), not bitrate estimation
 
 
 # Copyrights

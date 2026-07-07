@@ -221,6 +221,7 @@ static struct quantizer_spec quantizer_table[17] = {
 
 mp2Processor::mp2Processor(int16_t bitRate, audioOut_t soundOut,
                            dataOut_t dataOut, programQuality_t mscQuality,
+                           audioCodec_t audioCodecHandler,
                            motdata_t motdata_Handler, void *ctx)
     : my_padHandler(dataOut, motdata_Handler, ctx) {
   int16_t i, j;
@@ -241,6 +242,7 @@ mp2Processor::mp2Processor(int16_t bitRate, audioOut_t soundOut,
   this->soundOut = soundOut;
   this->dataOut = dataOut;
   this->mscQuality = mscQuality;
+  this->audioCodecHandler = audioCodecHandler;
   this->errorReportHandler = nullptr;
   Voffs = 0;
   baudRate = 48000;             // default for DAB
@@ -400,9 +402,15 @@ int32_t mp2Processor::mp2decodeFrame(uint8_t *frame, int16_t *pcm,
     bit_rate_index_minus1 += 14;
   }
 
+  const int16_t mp2Lsf = (sampling_frequency & 4) ? 1 : 0;
+
   padding_bit = get_bits(1);
   get_bits(1);  // discard private_bit
   mode = get_bits(2);
+
+  if (audioCodecHandler != nullptr) {
+    audioCodecHandler(0, -1, -1, -1, (int16_t)mode, mp2Lsf, ctx);
+  }
 
   // parse the mode_extension, set up the stereo bound
   if (mode == JOINT_STEREO)

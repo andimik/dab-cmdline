@@ -115,6 +115,18 @@ struct MyServiceData {
 	gotAudioPacket [2] = false;
 	gotAudioPacket [3] = false;
 	gotPacket = false;
+	// Runtime analysis state for real audio codec detection.
+	lastFrameErrors = -1;
+	lastRsErrors = -1;
+	lastAacErrors = -1;
+	qualityUpdates = 0;
+	codecSeen = false;
+	codecASCTy = -1;
+	aacChannelMode = -1;
+	sbrFlag = -1;
+	psFlag = -1;
+	mp2Mode = -1;
+	mp2Lsf = -1;
 	}
 
 	int SId;
@@ -127,6 +139,21 @@ struct MyServiceData {
 	packetdata	audiopacket[4];
 	bool gotPacket;
 	packetdata packet;
+	
+	// Audio quality metrics collected from decoder callbacks.
+	int16_t lastFrameErrors;   // DAB frame errors or DAB+ DAB_ frame errors
+	int16_t lastRsErrors;      // Reed Solomon errors (DAB+ only)
+	int16_t lastAacErrors;     // AAC frame errors (DAB+ only)
+	int qualityUpdates;
+
+	// Real codec metadata extracted from decoded frames (not guessed).
+	bool codecSeen;
+	int16_t codecASCTy;
+	int16_t aacChannelMode;
+	int16_t sbrFlag;
+	int16_t psFlag;
+	int16_t mp2Mode;
+	int16_t mp2Lsf;
 };
 
 struct MyGlobals {
@@ -798,6 +825,105 @@ static void mscQuality(int16_t fe, int16_t rsE, int16_t aacE, void *ctx) {
     stat_minAacE = stat_maxAacE = aacE;
     stat_gotMsc = true;
   }
+  
+  // Track per-service quality metrics
+  // This helps with detailed audio analysis during -E scan
+  auto serviceIt = globals.channels.find(serviceIdentifier);
+  if (serviceIt != globals.channels.end() && serviceIt->second) {
+    serviceIt->second->lastFrameErrors = fe;
+    serviceIt->second->lastRsErrors = rsE;
+    serviceIt->second->lastAacErrors = aacE;
+		serviceIt->second->qualityUpdates++;
+  }
+}
+
+static void audioCodecHandler(int16_t ASCTy, int16_t aacChannelMode,
+															int16_t sbrFlag, int16_t psFlag,
+															int16_t mp2Mode, int16_t mp2Lsf, void *ctx) {
+	(void)ctx;
+	auto serviceIt = globals.channels.find(serviceIdentifier);
+	if (serviceIt == globals.channels.end() || !serviceIt->second) return;
+
+	MyServiceData *svc = serviceIt->second;
+	svc->codecSeen = true;
+	svc->codecASCTy = ASCTy;
+	svc->aacChannelMode = aacChannelMode;
+	svc->sbrFlag = sbrFlag;
+	svc->psFlag = psFlag;
+	svc->mp2Mode = mp2Mode;
+	svc->mp2Lsf = mp2Lsf;
+}
+
+static const char *codecFromRealAnalysis(const MyServiceData &svc,
+																				 int16_t ASCTy) {
+	if (ASCTy == 63) {
+		if (!svc.codecSeen || svc.codecASCTy != 63)
+			return "DAB+/no audio";
+
+		if (svc.sbrFlag == 1 && svc.psFlag == 1)
+			return "DAB+/HE-AAC v2 Parametric Stereo";
+		if (svc.sbrFlag == 1)
+			return (svc.aacChannelMode == 1) ? "DAB+/HE-AAC v1 Stereo"
+																			 : "DAB+/HE-AAC v1 Mono";
+
+		return (svc.aacChannelMode == 1) ? "DAB+/AAC-LC Stereo"
+																		 : "DAB+/AAC-LC Mono";
+	}
+
+	if (ASCTy == 0) {
+		if (!svc.codecSeen || svc.codecASCTy != 0)
+			return "DAB/no audio";
+
+		if (svc.mp2Lsf == 1 && svc.mp2Mode == 3)
+			return "DAB/MP2 Mono LSF";
+
+		switch (svc.mp2Mode) {
+			case 0:
+				return "DAB/MP2 Stereo";
+			case 1:
+				return "DAB/MP2 Joint Stereo";
+			case 3:
+				return "DAB/MP2 Mono";
+			default:
+				return "DAB/no audio";
+		}
+	}
+
+	return "unknown audio codec";
+}
+
+static void probeAudioServiceCodec(void *radio, int32_t sid, audiodata &ad,
+																	 int timeoutMs) {
+	auto it = globals.channels.find(sid);
+	if (it == globals.channels.end() || !it->second) return;
+
+	MyServiceData *svc = it->second;
+	svc->lastFrameErrors = -1;
+	svc->lastRsErrors = -1;
+	svc->lastAacErrors = -1;
+	svc->qualityUpdates = 0;
+	svc->codecSeen = false;
+	svc->codecASCTy = -1;
+	svc->aacChannelMode = -1;
+	svc->sbrFlag = -1;
+	svc->psFlag = -1;
+	svc->mp2Mode = -1;
+	svc->mp2Lsf = -1;
+
+	serviceIdentifier = sid;
+	dabReset_msc(radio);
+	set_audioChannel(radio, &ad);
+
+	int elapsed = 0;
+	while (elapsed < timeoutMs) {
+		sleepMillis(T_GRANULARITY);
+		elapsed += T_GRANULARITY;
+
+		if (svc->codecSeen) break;
+		if (svc->qualityUpdates >= 2) break;
+	}
+
+	dabReset_msc(radio);
 }
 
 void printCollectedCallbackStat(const char *txt, int out) {
@@ -1247,6 +1373,7 @@ int	main (int argc, char **argv) {
 	dab_setEId_handler	(theRadio, ensembleIdHandler);
 	dab_setError_handler	(theRadio, decodeErrorReportHandler);
 	dab_setFIB_handler	(theRadio, fib_dataHandler);
+	dab_setAudioCodec_handler(theRadio, audioCodecHandler);
 
 	theDevice	-> setGain (theGain);
 	if (autogain)
@@ -1669,6 +1796,31 @@ int	main (int argc, char **argv) {
 	         if (countryId == 0)
 	            countryId = serviceCountryIdFromSid(static_cast<uint32_t>(serviceIdentifier));
 	         assert (i == ad.componentNr);
+
+	         probeAudioServiceCodec(theRadio, serviceIdentifier, ad, 2200);
+	         MyServiceData *svc = it.second;
+	         const char *codecDescription = "unknown audio codec";
+	         if (svc) {
+	            if (svc->codecSeen) {
+	               codecDescription = codecFromRealAnalysis(*svc, ad.ASCTy);
+	            } else if (svc->qualityUpdates <= 0) {
+	               codecDescription = (ad.ASCTy == 63)
+	                                      ? "DAB+/too weak signal"
+	                                      : "DAB/too weak signal";
+	            } else {
+	               const int16_t q = (ad.ASCTy == 63) ? svc->lastAacErrors
+	                                                  : svc->lastFrameErrors;
+	               if (q < 0 || q < 20)
+	                  codecDescription = (ad.ASCTy == 63)
+	                                         ? "DAB+/too weak signal"
+	                                         : "DAB/too weak signal";
+	               else
+	                  codecDescription = (ad.ASCTy == 63)
+	                                         ? "DAB+/no audio"
+	                                         : "DAB/no audio";
+	            }
+	         }
+
 	         if (!printAsCSV) {
 	            fprintf (infoStrm, "\taudioData:\n");
 	            fprintf (infoStrm, "\t\tsubchId\t\t= %d\n",
@@ -1691,6 +1843,7 @@ int	main (int argc, char **argv) {
 	                              int(ad.bitRate));
 	            fprintf (infoStrm, "\t\tASCTy\t\t= %d: '%s'\n",
 	                              int(ad.ASCTy), getASCTy(ad.ASCTy));
+	            fprintf (infoStrm, "\t\taudioCodec\t= '%s'\n", codecDescription);
                                 
 				uint8_t effectiveEcc = (ad.ecc != 0) ? ad.ecc : eccCode;
 				fprintf(infoStrm, "\t\tcountry\tECC %X, Id %X: '%s'\n",
@@ -1722,6 +1875,7 @@ int	main (int argc, char **argv) {
               outLine += comma + std::to_string(int(ad.bitRate));
               outLine += comma + std::to_string(int(ad.ASCTy));
               outLine += comma + prepCsvStr(getASCTy(ad.ASCTy));
+							outLine += comma + prepCsvStr(codecDescription);
               
               // proposed by AI
               

@@ -841,8 +841,7 @@ static void mscQuality(int16_t fe, int16_t rsE, int16_t aacE, void *ctx) {
 
 static void audioCodecHandler(int16_t ASCTy, int16_t aacChannelMode,
 															int16_t sbrFlag, int16_t psFlag,
-															int16_t mp2Mode, int16_t mp2Lsf,
-															int32_t samplingRate, void *ctx) {
+															int16_t mp2Mode, int16_t mp2Lsf, void *ctx) {
 	(void)ctx;
 	auto serviceIt = globals.channels.find(serviceIdentifier);
 	if (serviceIt == globals.channels.end() || !serviceIt->second) return;
@@ -855,7 +854,6 @@ static void audioCodecHandler(int16_t ASCTy, int16_t aacChannelMode,
 	svc->psFlag = psFlag;
 	svc->mp2Mode = mp2Mode;
 	svc->mp2Lsf = mp2Lsf;
-	svc->samplingRate = samplingRate;
 }
 
 static const char *codecFromRealAnalysis(const MyServiceData &svc,

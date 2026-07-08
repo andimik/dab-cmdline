@@ -409,7 +409,8 @@ int32_t mp2Processor::mp2decodeFrame(uint8_t *frame, int16_t *pcm,
   mode = get_bits(2);
 
   if (audioCodecHandler != nullptr) {
-    audioCodecHandler(0, -1, -1, -1, (int16_t)mode, mp2Lsf, ctx);
+    audioCodecHandler(0, -1, -1, -1, (int16_t)mode, mp2Lsf,
+                      (int32_t)sample_rates[sampling_frequency], ctx);
   }
 
   // parse the mode_extension, set up the stereo bound

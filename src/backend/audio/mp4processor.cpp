@@ -169,9 +169,26 @@ bool mp4Processor::processSuperframe(uint8_t frameBytes[], int16_t base) {
   streamParameters.mpegSurround = (outVector[2] & 07);         // bits 21 .. 23
 
   if (audioCodecHandler != nullptr) {
+    int32_t samplingRate = 0;
+    switch (2 * streamParameters.dacRate + streamParameters.sbrFlag) {
+      case 0:
+        samplingRate = 32000;
+        break;
+      case 1:
+        samplingRate = 16000;
+        break;
+      case 2:
+        samplingRate = 48000;
+        break;
+      case 3:
+        samplingRate = 24000;
+        break;
+      default:
+        break;
+    }
     audioCodecHandler(63, streamParameters.aacChannelMode,
                       streamParameters.sbrFlag, streamParameters.psFlag, -1,
-                      -1, ctx);
+                      -1, samplingRate, ctx);
   }
 
   switch (2 * streamParameters.dacRate + streamParameters.sbrFlag) {

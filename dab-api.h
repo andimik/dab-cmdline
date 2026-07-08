@@ -159,7 +159,8 @@ typedef void (*programQuality_t)(int16_t, int16_t, int16_t, void *);
 //		aacChannelMode/sbrFlag/psFlag are -1
 typedef void (*audioCodec_t)(int16_t ASCTy, int16_t aacChannelMode,
                              int16_t sbrFlag, int16_t psFlag,
-                             int16_t mp2Mode, int16_t mp2Lsf, void *);
+                             int16_t mp2Mode, int16_t mp2Lsf,
+                             int32_t samplingRate, void *);
 
 //	immediate report of program errors - to allow early abortion
 //	1st number is error type:

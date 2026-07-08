@@ -1890,7 +1890,7 @@ int	main (int argc, char **argv) {
                   comma + prepCsvStr(getCodeRate(ad.shortForm, ad.protLevel));
               outLine += comma + std::to_string(int(ad.bitRate));
               outLine += comma + std::to_string(int(ad.ASCTy));
-              outLine += comma + prepCsvStr(getASCTy(ad.ASCTy));
+//               outLine += comma + prepCsvStr(getASCTy(ad.ASCTy));
 							outLine += comma + prepCsvStr(codecWithRate.c_str());
               
               // proposed by AI

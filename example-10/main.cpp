@@ -120,6 +120,7 @@ struct MyServiceData {
 	lastRsErrors = -1;
 	lastAacErrors = -1;
 	qualityUpdates = 0;
+	probePcmBlocks = 0;
 	codecSeen = false;
 	codecASCTy = -1;
 	aacChannelMode = -1;
@@ -146,6 +147,7 @@ struct MyServiceData {
 	int16_t lastRsErrors;      // Reed Solomon errors (DAB+ only)
 	int16_t lastAacErrors;     // AAC frame errors (DAB+ only)
 	int qualityUpdates;
+	int probePcmBlocks;
 
 	// Real codec metadata extracted from decoded frames (not guessed).
 	bool codecSeen;
@@ -533,6 +535,9 @@ void	bytesOut_Handler (uint8_t *data, int16_t amount,
 static
 void	pcmHandler (int16_t *buffer, int size,
 	                            int rate, bool isStereo, void *ctx) {
+	auto serviceIt = globals.channels.find(serviceIdentifier);
+	if (serviceIt != globals.channels.end() && serviceIt->second)
+		serviceIt->second->probePcmBlocks++;
 
 	if (scanOnly)
 	   return;
@@ -907,6 +912,7 @@ static void probeAudioServiceCodec(void *radio, int32_t sid, audiodata &ad,
 	svc->lastRsErrors = -1;
 	svc->lastAacErrors = -1;
 	svc->qualityUpdates = 0;
+	svc->probePcmBlocks = 0;
 	svc->codecSeen = false;
 	svc->codecASCTy = -1;
 	svc->aacChannelMode = -1;
@@ -925,7 +931,8 @@ static void probeAudioServiceCodec(void *radio, int32_t sid, audiodata &ad,
 		sleepMillis(T_GRANULARITY);
 		elapsed += T_GRANULARITY;
 
-		if (svc->codecSeen) break;
+		if (svc->probePcmBlocks > 0) break;
+		if (svc->codecSeen && svc->qualityUpdates > 0) break;
 		if (svc->qualityUpdates >= 2) break;
 	}
 
@@ -1808,9 +1815,22 @@ int	main (int argc, char **argv) {
 	         const char *codecDescription = "unknown audio codec";
 	         int32_t codecSamplingRate = 0;
 	         if (svc) {
-	            codecSamplingRate = svc->samplingRate;
-	            if (svc->codecSeen) {
+	            if (svc->probePcmBlocks > 0)
+	               codecSamplingRate = svc->samplingRate;
+	            if (svc->codecSeen && svc->probePcmBlocks > 0) {
 	               codecDescription = codecFromRealAnalysis(*svc, ad.ASCTy);
+	               if (svc->qualityUpdates > 0) {
+	                  const int16_t q = (ad.ASCTy == 63) ? svc->lastAacErrors
+	                                                     : svc->lastFrameErrors;
+	                  if (q >= 20)
+	                     codecDescription = (ad.ASCTy == 63)
+	                                            ? "DAB+/no audio"
+	                                            : "DAB/no audio";
+	               }
+	            } else if (svc->codecSeen) {
+	               codecDescription = (ad.ASCTy == 63)
+	                                      ? "DAB+/no audio"
+	                                      : "DAB/no audio";
 	            } else if (svc->qualityUpdates <= 0) {
 	               codecDescription = (ad.ASCTy == 63)
 	                                      ? "DAB+/too weak signal"

@@ -172,16 +172,16 @@ bool mp4Processor::processSuperframe(uint8_t frameBytes[], int16_t base) {
     int32_t samplingRate = 0;
     switch (2 * streamParameters.dacRate + streamParameters.sbrFlag) {
       case 0:
-        samplingRate = 32000;
+        samplingRate = 32000; // for AAC-LC
         break;
       case 1:
-        samplingRate = 16000;
+        samplingRate = 32000; // for HE-AAC (SBR)
         break;
       case 2:
-        samplingRate = 48000;
+        samplingRate = 48000; // for AAC-LC
         break;
       case 3:
-        samplingRate = 24000;
+        samplingRate = 48000; // for HE-AAC (SBR)
         break;
       default:
         break;

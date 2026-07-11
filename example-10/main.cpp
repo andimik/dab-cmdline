@@ -101,6 +101,7 @@ static const char *outWaveFilename = nullptr;
 static int32_t outFrequency = 0;
 static double recDuration = -1.0;
 static uint32_t recDurationSmp = 0;
+static bool detailedAudioAnalysis = false;
 
 static int32_t timeOut = 0;
 static int32_t nextOut = 0;
@@ -902,6 +903,14 @@ static const char *codecFromRealAnalysis(const MyServiceData &svc,
 	return "unknown audio codec";
 }
 
+static const char *codecWithAnalysisDisabled(int16_t ASCTy) {
+	if (ASCTy == 63)
+		return "DAB+/audio details check disabled";
+	if (ASCTy == 0)
+		return "DAB/audio details check disabled";
+	return "unknown audio codec";
+}
+
 static void probeAudioServiceCodec(void *radio, int32_t sid, audiodata &ad,
 																	 int timeoutMs) {
 	auto it = globals.channels.find(sid);
@@ -1172,7 +1181,7 @@ int	main (int argc, char **argv) {
 
 	while (
 	      (opt = getopt(argc, argv,
-                    "W:A:M:B:P:p:T:S:E:cft:a:r:xO:w:n:z:v" FILE_OPTS NON_FILE_OPTS
+                    "W:A:M:B:P:p:T:S:E:cft:a:r:xDO:w:n:z:v" FILE_OPTS NON_FILE_OPTS
                         RTLSDR_OPTS RTL_TCP_OPTS)) != -1) {
 	   fprintf(stderr, "opt = %c\n", opt);
 
@@ -1223,6 +1232,9 @@ int	main (int argc, char **argv) {
 	         fprintf (stderr,
 	                  "read option -x : using %s Tii algorithm\n",
 	                                 (useExTii ? "extended" : "Jan's"));
+	         break;
+	      case 'D':
+	         detailedAudioAnalysis = true;
 	         break;
 	      case 'M':
 	         theMode = atoi(optarg);
@@ -1810,11 +1822,12 @@ int	main (int argc, char **argv) {
 	            countryId = serviceCountryIdFromSid(static_cast<uint32_t>(serviceIdentifier));
 	         assert (i == ad.componentNr);
 
-	         probeAudioServiceCodec(theRadio, serviceIdentifier, ad, 2200);
 	         MyServiceData *svc = it.second;
-	         const char *codecDescription = "unknown audio codec";
+	         const char *codecDescription =
+	                               codecWithAnalysisDisabled(ad.ASCTy);
 	         int32_t codecSamplingRate = 0;
-	         if (svc) {
+	         if (detailedAudioAnalysis && svc) {
+	            probeAudioServiceCodec(theRadio, serviceIdentifier, ad, 2200);
 	            if (svc->probePcmBlocks > 0)
 	               codecSamplingRate = svc->samplingRate;
 	            if (svc->codecSeen && svc->probePcmBlocks > 0) {
@@ -2094,6 +2107,7 @@ void printOptions(void) {
 	-r number   reset tii spectral power every number frames. default: 10\n\
 	            tii statistics is output in scan mode\n\
 	-x          switch tii algorithm to extended one\n\
+	-D          enable detailed audio analysis in scan output\n\
 	-c          activates CSV output mode\n\
 	-M Mode     Mode is 1, 2 or 4. Default is Mode 1\n\
 	-B Band     Band is either L_BAND or BAND_III (default)\n\

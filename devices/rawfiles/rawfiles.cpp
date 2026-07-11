@@ -43,9 +43,10 @@ static inline int64_t getMyTime(void) {
 #define __BUFFERSIZE 16 * 32768
 //
 //
-rawFiles::rawFiles(std::string f, bool repeater) {
+rawFiles::rawFiles(std::string f, bool repeater, bool noRealtime) {
   fileName = f;
   (void)repeater;
+  this->noRealtime = noRealtime;
   _I_Buffer = new RingBuffer<std::complex<float>>(__BUFFERSIZE);
   if ( !strcmp(f.c_str(), "-" ) ) {
     filePointer = stdin;
@@ -68,8 +69,10 @@ rawFiles::rawFiles(std::string f, bool repeater) {
 }
 
 rawFiles::rawFiles(std::string f, double fileOffsetInSeconds,
-                   device_eof_callback_t eofHandler, void *userData) {
+                   device_eof_callback_t eofHandler, void *userData,
+                   bool noRealtime) {
   fileName = f;
+  this->noRealtime = noRealtime;
   _I_Buffer = new RingBuffer<std::complex<float>>(__BUFFERSIZE);
   if ( !strcmp(f.c_str(), "-" ) ) {
     filePointer = stdin;
@@ -112,8 +115,31 @@ bool rawFiles::restartReader(int32_t frequency) {
 }
 
 void rawFiles::stopReader(void) {
-  if (running.load()) workerHandle.join();
-  running.store(false);
+  if (running.load()) running.store(false);
+  if (workerHandle.joinable()) workerHandle.join();
+}
+
+bool rawFiles::rewindToStart(void) {
+  return seekToSeconds(0.0);
+}
+
+bool rawFiles::seekToSeconds(double seconds) {
+  if (filePointer == nullptr || filePointer == stdin) return false;
+  if (seconds < 0.0) seconds = 0.0;
+
+  const bool wasRunning = running.load();
+  if (wasRunning) stopReader();
+
+  _I_Buffer->FlushRingBuffer();
+  const int64_t targetPos = (int64_t)(seconds * 2048000.0 * 2.0);
+  fseek(filePointer, targetPos, SEEK_SET);
+  currPos = 0;
+
+  if (wasRunning) {
+    workerHandle = std::thread(&rawFiles::run, this);
+    running.store(true);
+  }
+  return true;
 }
 
 int32_t rawFiles::getSamples(std::complex<float> *V, int32_t size) {
@@ -146,6 +172,7 @@ void rawFiles::run(void) {
   running.store(true);
   period = ((int64_t)32768 * 1000) / 2048;  // full IQs read
   fprintf(stderr, "Period = %" PRId64 "\n", period);
+  if (noRealtime) fprintf(stderr, "File input pacing disabled (-X)\n");
   bi = new std::complex<float>[bufferSize];
   nextStop = getMyTime();
   while (running.load()) {
@@ -167,7 +194,8 @@ void rawFiles::run(void) {
       eofReached = false;
       if (eofHandler != nullptr) eofHandler(userData);
     }
-    while (nextStop - getMyTime() > 0) usleep(nextStop - getMyTime());
+    if (!noRealtime)
+      while (nextStop - getMyTime() > 0) usleep(nextStop - getMyTime());
   }
   fprintf(stderr, "taak voor replay eindigt hier\n");
 }

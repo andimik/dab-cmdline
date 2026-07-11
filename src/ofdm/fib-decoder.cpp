@@ -640,13 +640,11 @@ int16_t fib_processor::HandleFIG0Extension5(const uint8_t *d, uint8_t CN_bit,
       subChId = getBits_6(d, loffset + 2);
       language = getBits_8(d, loffset + 8);
       subChannels[subChId].language = language;
-      fprintf(stderr, "FIG0Ext5: Short, SubChId %d, language %d\n", (int)subChId, (int)language);
     }
     loffset += 16;
   } else {  // long form
     serviceComp = getBits(d, loffset + 4, 12);
     language = getBits_8(d, loffset + 16);
-    fprintf(stderr, "FIG0Ext5: Long, serviceComp %d, language %d\n", (int)serviceComp, (int)language);
     loffset += 24;
   }
   (void)serviceComp;

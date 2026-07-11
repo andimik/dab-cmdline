@@ -102,6 +102,10 @@ static int32_t outFrequency = 0;
 static double recDuration = -1.0;
 static uint32_t recDurationSmp = 0;
 static bool detailedAudioAnalysis = false;
+static bool rewindPerServiceAudioAnalysis = false;
+static bool haveProbeSeekOffset = false;
+static double probeSeekOffsetSec = 0.0;
+static std::atomic<bool> suppressMetadataCallbacks(false);
 
 static int32_t timeOut = 0;
 static int32_t nextOut = 0;
@@ -405,6 +409,9 @@ void	printCollectedErrorStat (const char *txt) {
 static
 void	ensemblenameHandler (std::string name, std::string abbr,
 	                                           int EId, void *userData) {
+	if (suppressMetadataCallbacks.load())
+	   return;
+
 	if (ensembleIdentifier != (uint32_t)EId ||
 	                            ensembleRecognized.load())
 	   return;
@@ -421,6 +428,9 @@ void	ensemblenameHandler (std::string name, std::string abbr,
 
 static
 void	ensembleIdHandler (int EId, void *userData) {
+	if (suppressMetadataCallbacks.load())
+	   return;
+
 	fprintf (stderr,
 	         "\n" FMT_DURATION
 	         "ensembleIdHandler: ensemble (EId %X) is recognized\n\n" SINCE_START,
@@ -431,6 +441,9 @@ void	ensembleIdHandler (int EId, void *userData) {
 static
 void	programnameHandler (std::string s, std::string abbr,
 	                                       int SId, void *userdata) {
+	if (suppressMetadataCallbacks.load())
+	   return;
+
 	fprintf (stderr,
 	         "programnameHandler: '%s' / '%s' (SId %X) is part of the ensemble\n",
 	        s. c_str (), abbr. c_str (), SId);
@@ -474,6 +487,9 @@ void	programdataHandler (audiodata *d, void *ctx) {
 static
 void	dataOut_Handler (std::string dynamicLabel, void *ctx) {
 	(void)ctx;
+	if (suppressMetadataCallbacks.load())
+	   return;
+
 	static std::string lastLabel;
 	if (lastLabel != dynamicLabel) {
 	   fprintf (stderr, "dataOut: dynamicLabel = '%s'\n",
@@ -725,6 +741,7 @@ void	systemData (bool flag, int16_t snr, int32_t freqOff, void *ctx) {
 
 static
 void tii(int16_t mainId, int16_t subId, unsigned tii_num, void *ctx) {
+	if (suppressMetadataCallbacks.load()) return;
   ++numAllTii;
   if (mainId >= 0) {
     int combinedId = mainId * 100 + subId;
@@ -743,6 +760,7 @@ static int gPavg_T_u = 0;
 static void tiiEx(int numOut, int *outTii, float *outAvgSNR, float *outMinSNR,
                   float *outNxtSNR, unsigned numAvg, const float *Pavg,
                   int Pavg_T_u, void *ctx) {
+	if (suppressMetadataCallbacks.load()) return;
   int i;
   if (!numOut) return;
   for (i = 0; i < numOut; ++i) {
@@ -913,8 +931,21 @@ static const char *codecWithAnalysisDisabled(int16_t ASCTy) {
 
 static void probeAudioServiceCodec(void *radio, int32_t sid, audiodata &ad,
 																	 int timeoutMs) {
+	static bool rewindWarned = false;
 	auto it = globals.channels.find(sid);
 	if (it == globals.channels.end() || !it->second) return;
+
+	suppressMetadataCallbacks.store(true);
+	if (rewindPerServiceAudioAnalysis && theDevice) {
+		const bool rewound = haveProbeSeekOffset
+		                       ? theDevice->seekToSeconds(probeSeekOffsetSec)
+		                       : theDevice->rewindToStart();
+		if (!rewound && !rewindWarned) {
+			fprintf(stderr,
+			        "warning: -Y requested, but input cannot rewind; continuing without rewind\n");
+			rewindWarned = true;
+		}
+	}
 
 	MyServiceData *svc = it->second;
 	svc->lastFrameErrors = -1;
@@ -946,6 +977,7 @@ static void probeAudioServiceCodec(void *radio, int32_t sid, audiodata &ad,
 	}
 
 	dabReset_msc(radio);
+	suppressMetadataCallbacks.store(false);
 }
 
 void printCollectedCallbackStat(const char *txt, int out) {
@@ -984,7 +1016,7 @@ void flush_fig_processings() {
 #endif
 }
 
-static bool repeater = false;
+static bool repeater = true;
 
 void device_eof_callback(void *userData) {
   (void)userData;
@@ -1041,6 +1073,7 @@ void allocateDevice(bool openDevice = false, int32_t frequency = 0,
                     bool autogain = true, uint16_t deviceIndex = -1,
                     const char *deviceSerial = NULL, const char *rtlOpts = NULL,
                     std::string *fileName = NULL, double fileOffset = 0.0,
+					bool noRealtime = false,
                     const char *hostname = NULL, int32_t basePort = 1234) {
   try {
 #ifdef HAVE_SDRPLAY
@@ -1058,7 +1091,8 @@ void allocateDevice(bool openDevice = false, int32_t frequency = 0,
       fprintf(stderr, "try to open '%s' as wavFile ..\n", fileName->c_str());
       try {
         theDevice =
-            new wavFiles(*fileName, fileOffset, device_eof_callback, nullptr);
+						new wavFiles(*fileName, fileOffset, device_eof_callback, nullptr,
+												 noRealtime);
       } catch (int e) {
         // allow retry as RAW file (HAVE_RAWFILES)
         fprintf(stderr, "allocating wave device failed (%d), fatal\n", e);
@@ -1071,7 +1105,8 @@ void allocateDevice(bool openDevice = false, int32_t frequency = 0,
     if (!theDevice && fileName) {
       fprintf(stderr, "try to open '%s' as rawFile ..\n", fileName->c_str());
       theDevice =
-          new rawFiles(*fileName, fileOffset, device_eof_callback, nullptr);
+					new rawFiles(*fileName, fileOffset, device_eof_callback, nullptr,
+											 noRealtime);
     }
 #endif
 #elif HAVE_RTL_TCP
@@ -1126,6 +1161,7 @@ int	main (int argc, char **argv) {
 #if defined(HAVE_WAVFILES) || defined(HAVE_RAWFILES)
 	std::string fileName;
 	double fileOffset	= 0.0;
+	bool noRealtime		= false;
 #elif HAVE_RTL_TCP
 	std::string hostname	= "127.0.0.1";  // default
 	int32_t basePort	= 1234;		// default
@@ -1152,7 +1188,7 @@ int	main (int argc, char **argv) {
 //	For file input we do not need options like Q, G and C,
 //	We do need an option to specify the filename
 #if defined(HAVE_WAVFILES) || defined(HAVE_RAWFILES)
-#define FILE_OPTS "F:Ro:"
+	#define FILE_OPTS "F:Ro:XY"
 #define NON_FILE_OPTS
 #define RTL_TCP_OPTS
 #define RTLSDR_OPTS
@@ -1272,6 +1308,12 @@ int	main (int argc, char **argv) {
 	      case 'o':
 	         fileOffset = atof (optarg);
 	         break;
+	      case 'X':
+	         noRealtime = true;
+	         break;
+	      case 'Y':
+	         rewindPerServiceAudioAnalysis = true;
+	         break;
 #else
 	      case 'C':
 	         theChannel = std::string (optarg);
@@ -1339,9 +1381,9 @@ int	main (int argc, char **argv) {
 #endif
 	                rtlOpts,
 #if defined(HAVE_WAVFILES) || defined(HAVE_RAWFILES)
-	                &fileName, fileOffset,
+	                &fileName, fileOffset, noRealtime,
 #else
-	                NULL, 0.0,
+	                NULL, 0.0, false,
 #endif
 #ifdef HAVE_RTL_TCP
 	                hostname, basePort
@@ -1785,6 +1827,14 @@ int	main (int argc, char **argv) {
 #endif
 
 	for (auto &it : globals.channels) {
+	   if (rewindPerServiceAudioAnalysis && !haveProbeSeekOffset && theDevice) {
+	      const double off = theDevice->currentOffset();
+	      if (off >= 0.0) {
+	         probeSeekOffsetSec = off;
+	         haveProbeSeekOffset = true;
+	      }
+	   }
+
 	   serviceIdentifier = it.first;
 	   int numAudioInSvc = 0;
 	   int numPacketInSvc = 0;
@@ -2124,6 +2174,8 @@ void printOptions(void) {
       "	-F filename in case the input is from file\n"
       "	-o offset   offset in seconds from where to start file playback\n"
       "	-R          deactivates repetition of file playback\n"
+	"	-X          disable realtime pacing for file playback\n"
+	"	-Y          rewind file to start before each detailed audio analysis\n"
 
 #else
       "	-C channel  channel to be used\n\

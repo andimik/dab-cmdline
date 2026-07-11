@@ -37,6 +37,8 @@ Options available for file input builds (`HAVE_WAVFILES` or `HAVE_RAWFILES`):
 - `-F filename`: use file input
 - `-o offset`: start file playback at offset in seconds
 - `-R`: disable repetition of file playback
+- `-X`: disable realtime pacing for file playback (consume as fast as processing allows)
+- `-Y`: rewind file to the analysis start point (fallback: beginning) before each detailed audio analysis probe (`-D`)
 
 Options available for non-file input builds:
 

@@ -65,8 +65,11 @@ audioBackend::audioBackend(audiodata *d, audioOut_t soundOut,
   else
     protectionHandler = new eep_protection(bitRate, protLevel);
 
-  fprintf(stderr, "protection handler is %s\n",
-          shortForm ? "uep_protection" : "eep_protection");
+  static bool printedBackendInfo = false;
+  if (!printedBackendInfo) {
+    fprintf(stderr, "protection handler is %s\n",
+            shortForm ? "uep_protection" : "eep_protection");
+  }
   if (dabModus == DAB)
     our_backendBase = new mp2Processor(bitRate, soundOut, dataOut, mscQuality,
                                        audioCodecHandler, motdata_Handler,
@@ -78,7 +81,10 @@ audioBackend::audioBackend(audiodata *d, audioOut_t soundOut,
   else  // cannot happen
     our_backendBase = new backendBase();
 
-  fprintf(stderr, "we have now %s\n", dabModus == DAB_PLUS ? "DAB+" : "DAB");
+  if (!printedBackendInfo) {
+    fprintf(stderr, "we have now %s\n", dabModus == DAB_PLUS ? "DAB+" : "DAB");
+    printedBackendInfo = true;
+  }
   tempX.resize(fragmentSize);
   nextIn = 0;
   nextOut = 0;

@@ -2,14 +2,62 @@
 
 This is a fork of https://github.com/JvanKatwijk/dab-cmdline/ especially for use with https://github.com/hayguen/fmlist_scan 
 
-Compared to the initial project, it only contains basic inputs (rtlsdr, rawfiles, wavefile) as the FMLIST scan is based on RTLSDR sticks only.
+Compared to the initial project, it only contains basic inputs (rtlsdr, rtl_tcp, rawfiles, wavefile) as the FMLIST scan is based on RTLSDR sticks only.
 
 ## Example-10
+
+### Command line options
+
+The `example-10` binary prints the following command line options via `printOptions()`.
+Some options are only available depending on the build configuration and selected input backend.
+
+- `-W number`: amount of time to look for a time sync in ms
+- `-A number`: amount of time to look for an ensemble in ms
+- `-E minSNR`: activate scan mode; quit after loading scan data, and also quit if SNR is below `minSNR`
+- `-t number`: determine TII every number of frames, default `10`
+- `-a alfa`: update TII spectral power with factor `alfa` in range `0..1`, default `0.9`
+- `-r number`: reset TII spectral power every number of frames, default `10`
+- `-x`: switch TII algorithm to the extended one
+- `-D`: enable detailed audio analysis in scan output
+- `-c`: activate CSV output mode
+- `-M mode`: DAB mode `1`, `2` or `4`, default `1`
+- `-B band`: band is `L_BAND` or `BAND_III` (default)
+- `-P name`: select the program by name
+- `-p ppmCorr`: set ppm correction
+- `-T tol`: tolerate mismatch of up to `tol` ms from system time before recording is aborted; default `-1`, negative values disable aborting
+- `-S hexnumber`: use hexadecimal service id to identify a program
+- `-w fileName`: write audio to a wave file
+- `-f`: write binary FIC data to `ficdata.fic`
+- `-n runtime`: stream or save audio for `runtime` seconds, then exit
+- `-z freq_off`: set initial coarse frequency offset
+- `-v`: increase verbosity
+
+Options available for file input builds (`HAVE_WAVFILES` or `HAVE_RAWFILES`):
+
+- `-F filename`: use file input
+- `-o offset`: start file playback at offset in seconds
+- `-R`: disable repetition of file playback
+
+Options available for non-file input builds:
+
+- `-C channel`: select the DAB channel
+- `-G gain`: set device gain, range `1..100`
+- `-Q`: enable device autogain
+
+Options available for RTL-SDR builds (`HAVE_RTLSDR`):
+
+- `-d index`: set RTL-SDR device index
+- `-s serial`: set RTL-SDR device serial
+
+Options available for `rtl_tcp` builds (`HAVE_RTL_TCP`):
+
+- `-H hostname`: set `rtl_tcp` host name
+- `-I port`: set `rtl_tcp` port number
 
 ```
 dab-rtlsdr -E -Q -C 7D
 ```
-will print a summary after some seconds.
+will print a summary after some seconds:
 
 ```
 programnameHandler: 'EPG-SPI         ' / 'EPG-SPI' (SId E0500004) is part of the ensemble
@@ -42,26 +90,29 @@ FIG0Ext5: Short, SubChId 15, language 21
 FIG0Ext5: Short, SubChId 9, language 21
 ```
 
-Also detailled information, which will later be used on FMLIST (section URDS).
-
-```
-0872: checked program 'Radio Vaticana  ' with SId 410E
-	audioData:
-		subchId		= 9
-		startAddr	= 336
-		shortForm	= false
-		protLevel	= 2: 'EEP 3-A'
-		codeRate	= 2: '1/2'
-		length		= 36
-		bitRate		= 48
-		ASCTy		= 63: 'DAB+'
-		country	ECC E2, Id 4: 'Vatican'
-		language	= 21: 'Italian'
-		programType	= 20: 'Religion'
-LIST: SID 0000410E of type A has 1 audio and 0 packet components: 'Radio Vaticana  ' / 'Vaticana'
-```
-
 and a summary in `csv` format for the automatic upload of the FMLIST Scanner.
+
+Using parameter `-D` it will print detailled audio information, which can later be used on FMLIST (section URDS). If there is no audio at all, it will detect it as well. For weak signals, there will be a remark and the checks are skipped to avoid false values.
+
+Please note that the parameter `-D` will massivly increase the scan duration.
+
+```
+28762: checked program 'RADIO SUNBEAT   ' with SId 5FE6
+        audioData:
+                subchId         = 12
+                startAddr       = 372
+                shortForm       = false
+                protLevel       = 2: 'EEP 3-A'
+                codeRate        = 2: '1/2'
+                length          = 48
+                bitRate         = 64
+                ASCTy           = 63: 'DAB+'
+                audioCodec      = 'DAB+/HE-AAC v1 Stereo 48kHz'
+                country ECC E0, Id 5: 'Italy'
+                language        = 21: 'Italian'
+                programType     = 10: 'Pop Music'
+LIST: SID 00005FE6 of type A has 1 audio and 0 packet components: 'RADIO SUNBEAT   ' / 'SUNBEAT'
+```
 
 ```
 all meta info of fib_processor:
@@ -130,11 +181,80 @@ subChannels:
 25(20): subChID   25, startAddr 684, len  48, sz  48, long, idxOrCase 101, tabIdx -1, protLevel 1, bitRate  48, lang -1, FEC -1
 ```
 
+## Building
+
+The build entry point of this fork is [example-10/CMakeLists.txt](example-10/CMakeLists.txt). It uses CMake and defaults to a `Release` build if no build type is specified.
+
+Required core dependencies from the CMake configuration are:
+
+- FFTW3
+- FAAD / libfaad
+- zlib
+- pthread
+
+Additional libraries depend on the selected input backend, for example `librtlsdr` for `RTLSDR` or the matching `rtl_tcp` support.
+
+### Configure and build
+
+Build from inside the `example-10` directory with an out-of-source build:
+
+```sh
+cd example-10
+mkdir -p build
+cd build
+cmake .. -DRTLSDR=ON
+make
+```
+
+This produces one backend-specific binary name, depending on the enabled input:
+
+- `dab-rtlsdr` for `-DRTLSDR=ON`
+- `dab-rtl_tcp` for `-DRTL_TCP=ON`
+- `dab-files` for `-DWAVFILES=ON`
+- `dab-raw` for `-DRAWFILES=ON`
+
+If no input backend is selected explicitly, the build system falls back to `RTLSDR`.
+
+### Configure with `ccmake`
+
+You can also configure interactively with `ccmake`:
+
+```sh
+cd example-10
+mkdir -p build
+cd build
+ccmake ..
+```
+
+Inside `ccmake`, enable exactly the input backend you want, for example:
+
+- `RTLSDR`
+- `RTL_TCP`
+- `WAVFILES`
+- `RAWFILES`
+
+Then press `c` to configure, adjust remaining options if needed, press `c` again until generation is available, and press `g` to generate the build files. After that, build normally:
+
+```sh
+make
+```
+
+### Install
+
+To install the resulting binaries:
+
+```sh
+sudo make install
+```
+
+The default install prefix in the CMake file is `/usr/local` unless you override `CMAKE_INSTALL_PREFIX`.
+
 ## Todo-List:
 
 ### ideas
 
 - [x] add audio details (real decoder-based codec detection)
+- [x] use new command line parameter `-D` to enable the detailed audio analysis
 
 ### fixed bugs
 

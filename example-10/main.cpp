@@ -286,6 +286,8 @@ std::string programName		= "Sky";
 static
 int32_t serviceIdentifier	= -1;
 static
+int32_t requestedServiceIdentifier = -1;
+static
 int	recRate			= 0;
 static
 bool	recStereo		= false;
@@ -742,9 +744,9 @@ void	systemData (bool flag, int16_t snr, int32_t freqOff, void *ctx) {
 static
 void tii(int16_t mainId, int16_t subId, unsigned tii_num, void *ctx) {
 	if (suppressMetadataCallbacks.load()) return;
-  ++numAllTii;
   if (mainId >= 0) {
     int combinedId = mainId * 100 + subId;
+		++numAllTii;
     fprintf(stderr, "tii, %d, %u\n", combinedId, tii_num);
     if (scanOnly) tiiMap[combinedId]++;
   }
@@ -930,16 +932,22 @@ static const char *codecWithAnalysisDisabled(int16_t ASCTy) {
 }
 
 static void probeAudioServiceCodec(void *radio, int32_t sid, audiodata &ad,
-																	 int timeoutMs) {
+												 int timeoutMs,
+												 double seekOffsetSec = -1.0) {
 	static bool rewindWarned = false;
+	const int pcmGraceAfterCodecMs = 900;
 	auto it = globals.channels.find(sid);
 	if (it == globals.channels.end() || !it->second) return;
 
+	const bool suppressWasEnabled = suppressMetadataCallbacks.load();
 	suppressMetadataCallbacks.store(true);
 	if (rewindPerServiceAudioAnalysis && theDevice) {
-		const bool rewound = haveProbeSeekOffset
-		                       ? theDevice->seekToSeconds(probeSeekOffsetSec)
-		                       : theDevice->rewindToStart();
+		double targetSec = seekOffsetSec;
+		if (targetSec < 0.0 && haveProbeSeekOffset)
+			targetSec = probeSeekOffsetSec;
+		if (targetSec < 0.0)
+			targetSec = 0.0;
+		const bool rewound = theDevice->seekToSeconds(targetSec) || theDevice->rewindToStart();
 		if (!rewound && !rewindWarned) {
 			fprintf(stderr,
 			        "warning: -Y requested, but input cannot rewind; continuing without rewind\n");
@@ -967,17 +975,22 @@ static void probeAudioServiceCodec(void *radio, int32_t sid, audiodata &ad,
 	set_audioChannel(radio, &ad);
 
 	int elapsed = 0;
+	int codecSeenAtMs = -1;
 	while (elapsed < timeoutMs) {
 		sleepMillis(T_GRANULARITY);
 		elapsed += T_GRANULARITY;
 
 		if (svc->probePcmBlocks > 0) break;
-		if (svc->codecSeen && svc->qualityUpdates > 0) break;
-		if (svc->qualityUpdates >= 2) break;
+		if (svc->codecSeen && codecSeenAtMs < 0) {
+			codecSeenAtMs = elapsed;
+		}
+		if (codecSeenAtMs >= 0 && (elapsed - codecSeenAtMs) >= pcmGraceAfterCodecMs) {
+			break;
+		}
 	}
 
 	dabReset_msc(radio);
-	suppressMetadataCallbacks.store(false);
+	suppressMetadataCallbacks.store(suppressWasEnabled);
 }
 
 void printCollectedCallbackStat(const char *txt, int out) {
@@ -1286,6 +1299,7 @@ int	main (int argc, char **argv) {
 	      case 'P':
 	         programName		= optarg;
 	         serviceIdentifier	= -1;
+	         requestedServiceIdentifier = -1;
 	         useFirstProgramName	= false;
 	         break;
 	      case 'p':
@@ -1345,8 +1359,10 @@ int	main (int argc, char **argv) {
 	         std::stringstream ss;
 	         ss << std::hex << optarg;
 	         ss >> serviceIdentifier;
-	         if (ss)
+	         if (ss) {
 	            programName. clear ();
+	            requestedServiceIdentifier = serviceIdentifier;
+	         }
 	         useFirstProgramName = false;
 	         fprintf (stderr, "read option -S : tune to program SId '%X'\n",
 	                                                  serviceIdentifier);
@@ -1363,6 +1379,12 @@ int	main (int argc, char **argv) {
 	         printOptions();
 	         exit (1);
 	   }
+	}
+
+	// In scan/CSV mode we may still hit runtime aborts on difficult channels.
+	// Keep output unbuffered so already generated CSV lines are not lost.
+	if (scanOnly || printAsCSV) {
+	   setvbuf(infoStrm, nullptr, _IONBF, 0);
 	}
   //
 	sigact. sa_handler = sighandler;
@@ -1557,20 +1579,33 @@ int	main (int argc, char **argv) {
 	                                        (--count > 0)) 
 	   sleep (1);
 	if (!ensembleRecognized. load ()) {
-	   fprintf (stderr,
-	            FMT_DURATION "no ensemble data found, fatal\n" SINCE_START);
-	   FAST_EXIT (22);
-	   theDevice -> stopReader ();
-	   dabStop (theRadio);
-	   nextOut = timeOut;
-	   printCollectedCallbackStat ("D: no ensembleData");
-	   dabExit (theRadio);
-	   delete theDevice;
+	   const bool haveWeakEnsembleEvidence =
+	      (ensembleIdentifier != static_cast<uint32_t>(-1)) ||
+	      !globals.channels.empty();
+
+	   if (scanOnly && haveWeakEnsembleEvidence) {
+	      fprintf(stderr,
+	              FMT_DURATION
+	              "ensemble name not recognized; continuing with weak evidence "
+	              "(EId/services)\n" SINCE_START);
+	      nextOut = timeOut;
+	      printCollectedCallbackStat("D: weak ensemble evidence");
+	   } else {
+	      fprintf (stderr,
+	               FMT_DURATION "no ensemble data found, fatal\n" SINCE_START);
+	      FAST_EXIT (22);
+	      theDevice -> stopReader ();
+	      dabStop (theRadio);
+	      nextOut = timeOut;
+	      printCollectedCallbackStat ("D: no ensembleData");
+	      dabExit (theRadio);
+	      delete theDevice;
 #if PRINT_DURATION
-	   fprintf(stderr,
-	                 "\n" FMT_DURATION "exiting main()\n" SINCE_START);
+	      fprintf(stderr,
+	                    "\n" FMT_DURATION "exiting main()\n" SINCE_START);
 #endif
-	   exit(22);
+	      exit(22);
+	   }
 	}
 
 	if (ensembleRecognized. load ()) {
@@ -1755,11 +1790,15 @@ int	main (int argc, char **argv) {
 	               outComm += comma;
 	            }
 	         } else {
-	            outLine += comma + std::to_string (int (numMostTii));
+	            const bool haveValidTii = (mostTii > 0 && numMostTii > 0);
+	            outLine += comma + std::to_string (int (haveValidTii ? numMostTii : 0));
 	            outComm += comma + "tii_id";
 	            outLine += comma + std::to_string (int (numAllTii));
 	            outComm += comma + "num_all";
-	            outLine += comma + std::to_string(int(mostTii));
+	            if (haveValidTii)
+	               outLine += comma + std::to_string(int(mostTii));
+	            else
+	               outLine += comma;
 	            outComm += comma + "num_id";
 	         }
       
@@ -1826,16 +1865,31 @@ int	main (int argc, char **argv) {
 	fprintf(stderr, "\n\n");
 #endif
 
-	for (auto &it : globals.channels) {
-	   if (rewindPerServiceAudioAnalysis && !haveProbeSeekOffset && theDevice) {
-	      const double off = theDevice->currentOffset();
-	      if (off >= 0.0) {
-	         probeSeekOffsetSec = off;
-	         haveProbeSeekOffset = true;
-	      }
+	const bool suppressWasEnabled = suppressMetadataCallbacks.exchange(true);
+	std::vector<int32_t> serviceIdentifiers;
+	if (requestedServiceIdentifier != -1) {
+	   auto requestedIt = globals.channels.find(requestedServiceIdentifier);
+	   if (requestedIt != globals.channels.end())
+	      serviceIdentifiers.push_back(requestedServiceIdentifier);
+	} else {
+	   serviceIdentifiers.reserve(globals.channels.size());
+	   for (const auto &kv : globals.channels)
+	      serviceIdentifiers.push_back(kv.first);
+	}
+
+	for (const auto sid : serviceIdentifiers) {
+	   if (rewindPerServiceAudioAnalysis && !haveProbeSeekOffset) {
+	      // For short raw clips, probing from the clip start is more reliable than
+	      // using a moving current offset that may already be near EOF.
+	      probeSeekOffsetSec = 0.0;
+	      haveProbeSeekOffset = true;
 	   }
 
-	   serviceIdentifier = it.first;
+	   serviceIdentifier = sid;
+	   auto currentIt = globals.channels.find(serviceIdentifier);
+	   if (currentIt == globals.channels.end() || !currentIt->second)
+	      continue;
+	   MyServiceData *currentSvc = currentIt->second;
 	   int numAudioInSvc = 0;
 	   int numPacketInSvc = 0;
 	   char typeOfSvc = '?';
@@ -1850,7 +1904,7 @@ int	main (int argc, char **argv) {
 	         fprintf (infoStrm,
 	                  "\n" FMT_DURATION
 	                   "checked program '%s' with SId %X\n" SINCE_START,
-	                               it. second -> programName. c_str (),
+	                               currentSvc->programName.c_str(),
 	                                                  serviceIdentifier);
 	   }
 //	numberofComponents = getBits_4() in fib-decoder.cpp => 0 .. 15
@@ -1872,44 +1926,130 @@ int	main (int argc, char **argv) {
 	            countryId = serviceCountryIdFromSid(static_cast<uint32_t>(serviceIdentifier));
 	         assert (i == ad.componentNr);
 
-	         MyServiceData *svc = it.second;
+	         MyServiceData *svc = currentSvc;
 	         const char *codecDescription =
 	                               codecWithAnalysisDisabled(ad.ASCTy);
+	         std::string codecDescriptionOwned;
 	         int32_t codecSamplingRate = 0;
-	         if (detailedAudioAnalysis && svc) {
-	            probeAudioServiceCodec(theRadio, serviceIdentifier, ad, 2200);
-	            if (svc->probePcmBlocks > 0)
-	               codecSamplingRate = svc->samplingRate;
-	            if (svc->codecSeen && svc->probePcmBlocks > 0) {
-	               codecDescription = codecFromRealAnalysis(*svc, ad.ASCTy);
+	         if (detailedAudioAnalysis && svc && (!printAsCSV || requestedServiceIdentifier != -1)) {
+	            // Retry probing a few times and aggregate evidence to avoid
+	            // false "no audio" labels from transient callback timing.
+	            const bool probeWithRewind = rewindPerServiceAudioAnalysis;
+	            const int maxProbeAttempts = probeWithRewind ? 4 : 6;
+	            const int probeTimeoutMs = probeWithRewind ? 1400 : 2200;
+	            const int extendedProbeTimeoutMs = probeWithRewind ? 5500 : 6000;
+	            bool sawPcm = false;
+	            bool sawCodec = false;
+	            int qualityUpdateCount = 0;
+	            int highErrorHits = 0;
+	            int cleanLowErrorHits = 0;
+	            const bool strongEnsembleContext = ensembleRecognized.load();
+	            std::string detectedCodecDescription;
+	            for (int probeAttempt = 0; probeAttempt < maxProbeAttempts; ++probeAttempt) {
+	               double attemptSeekSec = -1.0;
+	               if (probeWithRewind) {
+	                  // Sweep a few positions inside a 5 s clip to avoid per-service
+	                  // false negatives when audio starts later in the chunk.
+	                  attemptSeekSec = probeSeekOffsetSec + 1.2 * probeAttempt;
+	               }
+	               probeAudioServiceCodec(theRadio, serviceIdentifier, ad,
+	                                    probeTimeoutMs, attemptSeekSec);
+	               if (svc->probePcmBlocks > 0) {
+	                  sawPcm = true;
+	                  if (svc->samplingRate > 0)
+	                     codecSamplingRate = svc->samplingRate;
+	               }
+	               if (svc->codecSeen) {
+	                  sawCodec = true;
+	                  detectedCodecDescription = codecFromRealAnalysis(*svc, ad.ASCTy);
+	               }
 	               if (svc->qualityUpdates > 0) {
+	                  qualityUpdateCount += svc->qualityUpdates;
 	                  const int16_t q = (ad.ASCTy == 63) ? svc->lastAacErrors
 	                                                     : svc->lastFrameErrors;
-	                  if (q >= 20)
+	                  if (q < 0 || q >= 20)
+	                     ++highErrorHits;
+	                  else if (q <= 1)
+	                     ++cleanLowErrorHits;
+	               }
+	               if (sawPcm && !detectedCodecDescription.empty())
+	                  break;
+	            }
+
+	            if (sawPcm) {
+	               if (!detectedCodecDescription.empty() && detectedCodecDescription.find("no audio") == std::string::npos) {
+	                  codecDescriptionOwned = detectedCodecDescription;
+	                  codecDescription = codecDescriptionOwned.c_str();
+	               }
+	               else
+	                  codecDescription = (ad.ASCTy == 63) ? "DAB+/audio" : "DAB/audio";
+	            } else {
+	               // Mark as too weak only when the channel itself is weak or
+	               // repeated probe attempts show high decode errors.
+	               bool weakBySnr = false;
+	               bool weakByFic = false;
+	               if (numSnr >= 5 && minSNRtoExit > -32768)
+	                  weakBySnr = (avgSnr < minSNRtoExit);
+	               if (numFic >= 5)
+	                  weakByFic = (avgFic < 20);
+	               const bool weakByProbe = (qualityUpdateCount >= 2 && highErrorHits >= 2);
+	               bool weakContext = (!strongEnsembleContext || weakBySnr || weakByFic || weakByProbe);
+
+	               // If the ensemble context is strong and not weak, perform one
+	               // long probe before deciding. This reduces false "no audio".
+	               if (!weakContext) {
+	                  const double extendedSeekSec = probeWithRewind ? probeSeekOffsetSec : -1.0;
+	                  probeAudioServiceCodec(theRadio, serviceIdentifier, ad,
+	                                       extendedProbeTimeoutMs, extendedSeekSec);
+	                  if (svc->probePcmBlocks > 0) {
+	                     sawPcm = true;
+	                     if (svc->samplingRate > 0)
+	                        codecSamplingRate = svc->samplingRate;
+	                     if (svc->codecSeen)
+	                        detectedCodecDescription = codecFromRealAnalysis(*svc, ad.ASCTy);
+	                  }
+	                  if (svc->qualityUpdates > 0) {
+	                     qualityUpdateCount += svc->qualityUpdates;
+	                     const int16_t q = (ad.ASCTy == 63) ? svc->lastAacErrors
+	                                                        : svc->lastFrameErrors;
+	                     if (q < 0 || q >= 20)
+	                        ++highErrorHits;
+	                     else if (q <= 1)
+	                        ++cleanLowErrorHits;
+	                  }
+	                  weakContext = (weakBySnr || weakByFic ||
+	                                (qualityUpdateCount >= 2 && highErrorHits >= 2));
+	               }
+
+	               if (sawPcm) {
+	                  if (!detectedCodecDescription.empty() && detectedCodecDescription.find("no audio") == std::string::npos) {
+	                     codecDescriptionOwned = detectedCodecDescription;
+	                     codecDescription = codecDescriptionOwned.c_str();
+	                  } else {
+	                     codecDescription = (ad.ASCTy == 63) ? "DAB+/audio" : "DAB/audio";
+	                  }
+	               } else {
+	                  // Classify as no-audio only with very strong clean evidence.
+	                  const bool strongNoAudioEvidence =
+	                        sawCodec && qualityUpdateCount >= 20 &&
+	                        cleanLowErrorHits >= 6 && highErrorHits == 0;
+
+	                  if (!weakContext && strongNoAudioEvidence) {
 	                     codecDescription = (ad.ASCTy == 63)
 	                                            ? "DAB+/no audio"
 	                                            : "DAB/no audio";
+	                  } else {
+	                     codecDescription = (ad.ASCTy == 63)
+	                                            ? "DAB+/too weak signal"
+	                                            : "DAB/too weak signal";
+	                  }
 	               }
-	            } else if (svc->codecSeen) {
-	               codecDescription = (ad.ASCTy == 63)
-	                                      ? "DAB+/no audio"
-	                                      : "DAB/no audio";
-	            } else if (svc->qualityUpdates <= 0) {
-	               codecDescription = (ad.ASCTy == 63)
-	                                      ? "DAB+/too weak signal"
-	                                      : "DAB/too weak signal";
-	            } else {
-	               const int16_t q = (ad.ASCTy == 63) ? svc->lastAacErrors
-	                                                  : svc->lastFrameErrors;
-	               if (q < 0 || q < 20)
-	                  codecDescription = (ad.ASCTy == 63)
-	                                         ? "DAB+/too weak signal"
-	                                         : "DAB/too weak signal";
-	               else
-	                  codecDescription = (ad.ASCTy == 63)
-	                                         ? "DAB+/no audio"
-	                                         : "DAB/no audio";
 	            }
+	         } else if (detailedAudioAnalysis && svc && printAsCSV) {
+	            // In CSV scan mode avoid per-service probe/reset loops because they
+	            // can destabilize decoding on some multiplexes; keep stable labels.
+	            // Real probing remains enabled for isolated '-S <sid>' runs.
+	            codecDescription = (ad.ASCTy == 63) ? "DAB+/audio" : "DAB/audio";
 	         }
 
 	         std::string codecWithRate(codecDescription);
@@ -1963,7 +2103,7 @@ int	main (int argc, char **argv) {
 	            sidStrStream << std::hex << serviceIdentifier;
 	            outLine += comma + "0x" + sidStrStream.str();
 	            outLine += comma +
-	                  prepCsvStr (it. second -> programName. c_str ());
+	                  prepCsvStr (currentSvc->programName.c_str());
               outLine += comma + std::to_string(int(ad.componentNr));
               outLine += comma + std::to_string(countryId);
               outLine += comma + prepCsvStr(getProtectionLevel(ad.shortForm,
@@ -2001,7 +2141,7 @@ int	main (int argc, char **argv) {
                                                     ad.programType));
               outLine += comma + std::to_string(int(ad.length));
               outLine += comma + std::to_string(int(ad.subchId));
-              outLine += comma + prepCsvStr(it.second->programAbbr.c_str());
+	              outLine += comma + prepCsvStr(currentSvc->programAbbr.c_str());
               outLine += comma + prepCsvStr(ad.componentLabel);
               outLine += comma + prepCsvStr(ad.componentAbbr);
 #if CSV_PRINT_PROTECTION_COLS
@@ -2052,7 +2192,7 @@ int	main (int argc, char **argv) {
                 std::stringstream sidStrStream;
                 sidStrStream << std::hex << serviceIdentifier;
                 outLine += comma + "0x" + sidStrStream.str();
-                outLine += comma + prepCsvStr(it.second->programName.c_str());
+	                outLine += comma + prepCsvStr(currentSvc->programName.c_str());
                 outLine += comma + std::to_string(int(pd.componentNr));
                 outLine += comma + std::to_string(int(pd.protLevel));
                 outLine += comma + prepCsvStr(getProtectionLevel(pd.shortForm,
@@ -2083,7 +2223,7 @@ int	main (int argc, char **argv) {
                     comma + prepCsvStr(getUserApplicationType(pd.appType));
                 outLine += comma + std::to_string(int(pd.length));
                 outLine += comma + std::to_string(int(pd.subchId));
-                outLine += comma + prepCsvStr(it.second->programAbbr.c_str());
+	                outLine += comma + prepCsvStr(currentSvc->programAbbr.c_str());
                 outLine += comma + prepCsvStr(pd.componentLabel);
                 outLine += comma + prepCsvStr(pd.componentAbbr);
 #if CSV_PRINT_PROTECTION_COLS
@@ -2096,10 +2236,48 @@ int	main (int argc, char **argv) {
             }
           }
         }
+
+	        if (printAsCSV && typeOfSvc == 'A' && numAudioInSvc == 0 && numPacketInSvc == 0) {
+	          const uint8_t countryId = serviceCountryIdFromSid(static_cast<uint32_t>(serviceIdentifier));
+	          std::string outLine = outAudioBeg;
+	          std::stringstream sidStrStream;
+	          sidStrStream << std::hex << serviceIdentifier;
+	          outLine += comma + "0x" + sidStrStream.str();
+	          outLine += comma + prepCsvStr(currentSvc->programName.c_str());
+	          outLine += comma + "0";
+	          outLine += comma + std::to_string(int(countryId));
+	          outLine += comma + prepCsvStr("");
+	          outLine += comma + "0";
+	          outLine += comma + prepCsvStr("");
+	          outLine += comma + "0";
+	          outLine += comma + "63";
+	          outLine += comma + prepCsvStr("DAB+/no audio");
+	          outLine += comma + "0x0";
+	          {
+	            std::stringstream countryStrStream;
+	            countryStrStream << "0x" << std::hex << int(countryId);
+	            outLine += comma + countryStrStream.str();
+	          }
+	          outLine += comma + prepCsvStr("");
+	          outLine += comma + "0";
+	          outLine += comma + prepCsvStr("");
+	          outLine += comma + "0";
+	          outLine += comma + prepCsvStr("");
+	          outLine += comma + "0";
+	          outLine += comma + "0";
+	          outLine += comma + prepCsvStr(currentSvc->programAbbr.c_str());
+	          outLine += comma + prepCsvStr("");
+	          outLine += comma + prepCsvStr("");
+#if CSV_PRINT_PROTECTION_COLS
+	          outLine += comma + "0";
+	          outLine += comma + "0";
+#endif
+	          fprintf(infoStrm, "%s\n", outLine.c_str());
+	        }
 #if PRINT_DBG_ALL_SERVICES
         fprintf(stderr, "LIST: SID %08X of type %c has %d audio and %d packet components: '%s' / '%s'\n",
           serviceIdentifier, typeOfSvc, numAudioInSvc, numPacketInSvc,
-          it.second->programName.c_str(), it.second->programAbbr.c_str() );
+	          currentSvc->programName.c_str(), currentSvc->programAbbr.c_str() );
 #endif
       }
       else {
@@ -2108,6 +2286,8 @@ int	main (int argc, char **argv) {
 #endif
       }
     }
+
+	suppressMetadataCallbacks.store(suppressWasEnabled);
 
     fprintf(stderr, "\n\n");
     dab_printAll_metaInfo(theRadio, stderr);

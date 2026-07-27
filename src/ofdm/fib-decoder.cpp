@@ -475,7 +475,7 @@ int16_t fib_processor::HandleFIG0Extension2(const uint8_t *d, int16_t offset,
   (void)OE_bit;
 int16_t lOffset = 8 * offset;
 // int16_t i;
-uint8_t ecc;
+uint8_t ecc = 0;
 uint8_t cId;
 uint32_t SId;
 int16_t numberofComponents;

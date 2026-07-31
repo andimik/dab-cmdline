@@ -1167,6 +1167,7 @@ int	main (int argc, char **argv) {
 	int	tii_resetFrames = 10;
 	bool	useExTii	= false;
 	const char *rtlOpts	= nullptr;
+	bool	isFileMode	= false;  // Track if analyzing from raw file (vs live)
 
 	int opt;
 	struct sigaction sigact;
@@ -1315,6 +1316,7 @@ int	main (int argc, char **argv) {
 #if defined(HAVE_WAVFILES) || defined(HAVE_RAWFILES)
 	      case 'F':
 	         fileName = std::string (optarg);
+	         isFileMode = true;
 	         break;
 	      case 'R':
 	         repeater = false;
@@ -1486,7 +1488,7 @@ int	main (int argc, char **argv) {
 	      sleepMillis(T_GRANULARITY);
 //	sleep (1);  // skip 1st sleep if possible
 	   printCollectedCallbackStat ("wait for timeSync ..");
-	   if (scanOnly && (numSnr >= 5) && (avgSnr < minSNRtoExit)) {
+	   if (scanOnly && !isFileMode && (numSnr >= 5) && (avgSnr < minSNRtoExit)) {
 	      fprintf (stderr,
 	               FMT_DURATION
 	               "abort because minSNR %d is not met. # is %ld avg %ld\n" SINCE_START,
@@ -1494,7 +1496,6 @@ int	main (int argc, char **argv) {
 	      abortForSnr = true;
 	      break;
 	   }
-
 	   if ((waitingTime >= waitingTimeInit) &&
 	                           (ensembleRecognized.load ())) {
 	      const bool prevContinueForFullEnsemble = continueForFullEnsemble;
@@ -1531,7 +1532,7 @@ int	main (int argc, char **argv) {
 	       (timeOutIncGranularity () < waitingTime)) {
 	   sleepMillis (T_GRANULARITY);
 	   printCollectedCallbackStat ("wait for full ensemble info..");
-	   if ((scanOnly && numSnr >= 5) && (avgSnr < minSNRtoExit)) {
+	   if ((scanOnly && !isFileMode && numSnr >= 5) && (avgSnr < minSNRtoExit)) {
 	      fprintf (stderr,
 	               FMT_DURATION
 	               "abort because minSNR %d is not met. # is %ld avg %ld\n" SINCE_START,
@@ -1561,7 +1562,7 @@ int	main (int argc, char **argv) {
 	        (timeOutIncGranularity () < waitingTime) && !abortForSnr) {
 	   sleepMillis (T_GRANULARITY);
 	   printCollectedCallbackStat ("C: collecting ensembleData ..");
-	   if (scanOnly && (numSnr >= 5) && (avgSnr < minSNRtoExit)) {
+	   if (scanOnly && !isFileMode && (numSnr >= 5) && (avgSnr < minSNRtoExit)) {
 	      fprintf (stderr, FMT_DURATION
 	                "abort because minSNR %d is not met. # is %ld avg %ld\n" SINCE_START,
 	                                   int (minSNRtoExit), numSnr, avgSnr);
@@ -1991,7 +1992,7 @@ int	main (int argc, char **argv) {
 	               if (numSnr >= 5 && minSNRtoExit > -32768)
 	                  weakBySnr = (avgSnr < minSNRtoExit);
 	               if (numFic >= 5)
-	                  weakByFic = (avgFic < 20);
+	                  weakByFic = (avgFic < 15);
 	               const bool weakByProbe = (qualityUpdateCount >= 2 && highErrorHits >= 2);
 	               bool weakContext = (!strongEnsembleContext || weakBySnr || weakByFic || weakByProbe);
 
